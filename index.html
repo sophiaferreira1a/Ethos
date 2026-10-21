@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ethos · Colégio Santa Maria Minas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- LOGIN -->
+<main id="tela-login" class="tela">
+  <div class="login-card">
+    <img class="logo-login" src="assets/logo-santa-maria.png" alt="Colégio Santa Maria Minas">
+    <h1>Ethos</h1>
+    <p class="sub" style="margin:-.5rem 0 .5rem">Registro de ocorrências · Acesso do professor</p>
+    <form id="form-login" novalidate>
+      <label for="email">E-mail</label>
+      <input id="email" type="email" autocomplete="username" inputmode="email" placeholder="nome@escola.com.br">
+      <small class="erro" data-erro="email"></small>
+
+      <label for="senha">Senha</label>
+      <input id="senha" type="password" autocomplete="current-password">
+      <small class="erro" data-erro="senha"></small>
+
+      <p id="dica" class="sub" style="margin-top:1rem" hidden>Prévia: use qualquer e-mail válido e senha com 4+ caracteres.</p>
+      <div id="msg-login" class="msg" role="alert" hidden></div>
+      <button class="btn primario" type="submit">Entrar</button>
+    </form>
+  </div>
+</main>
+
+<!-- ÁREA DO PROFESSOR -->
+<div id="tela-app" class="tela" hidden>
+  <header class="topo">
+    <div>
+      <img class="logo-topo" src="assets/brasao.png" alt=""><span class="marca">Ethos</span>
+      <span id="nome-prof" class="sub"></span>
+    </div>
+    <button id="btn-sair" class="btn texto" type="button">Sair</button>
+  </header>
+
+  <main class="conteudo">
+    <!-- Painel inicial -->
+    <section id="painel">
+      <h1>Olá, <span id="saudacao"></span></h1>
+      <p class="sub">Registre uma ocorrência em até 5 passos rápidos.</p>
+      <button id="btn-nova" class="btn primario grande" type="button">Nova ocorrência</button>
+    </section>
+
+    <!-- Formulário em passos -->
+    <section id="wizard" hidden>
+      <div class="progresso" aria-hidden="true"><i id="barra"></i></div>
+      <p id="passo-info" class="sub" aria-live="polite"></p>
+
+      <form id="form-oc" novalidate>
+        <!-- 1: aluno -->
+        <fieldset class="passo" data-passo="1">
+          <legend>Quem é o aluno?</legend>
+          <label for="turma">Turma</label>
+          <select id="turma"></select>
+
+          <label for="busca">Buscar aluno</label>
+          <input id="busca" type="search" autocomplete="off" placeholder="Digite o nome ou a matrícula">
+          <ul id="lista-alunos" class="lista" role="listbox" aria-label="Alunos"></ul>
+          <div id="aluno-sel" class="chip" hidden></div>
+          <small class="erro" data-erro="aluno"></small>
+        </fieldset>
+
+        <!-- 2: tipo -->
+        <fieldset class="passo" data-passo="2" hidden>
+          <legend>Qual o motivo da ocorrência?</legend>
+          <div id="tipos" class="opcoes"></div>
+          <small class="erro" data-erro="tipo"></small>
+        </fieldset>
+
+        <!-- 3: descrição -->
+        <fieldset class="passo" data-passo="3" hidden>
+          <legend>O que aconteceu?</legend>
+          <label for="descricao" class="sr">Descrição</label>
+          <textarea id="descricao" rows="6" maxlength="1000" placeholder="Descreva o fato de forma objetiva: o que, quando e onde."></textarea>
+          <div class="contador"><span id="cont">0</span>/1000</div>
+          <small class="erro" data-erro="descricao"></small>
+          <label for="data">Data da ocorrência</label>
+          <input id="data" type="date">
+          <small class="erro" data-erro="data"></small>
+        </fieldset>
+
+        <!-- 4: medidas -->
+        <fieldset class="passo" data-passo="4" hidden>
+          <legend>Quais medidas foram tomadas?</legend>
+          <div id="medidas" class="opcoes multi"></div>
+          <label for="medida-outra">Outra medida (opcional)</label>
+          <input id="medida-outra" type="text" maxlength="200">
+          <small class="erro" data-erro="medidas"></small>
+        </fieldset>
+
+        <!-- 5: revisão -->
+        <fieldset class="passo" data-passo="5" hidden>
+          <legend>Revise e envie</legend>
+          <dl id="resumo" class="resumo"></dl>
+        </fieldset>
+
+        <div id="msg-oc" class="msg" role="alert" hidden></div>
+
+        <div class="acoes">
+          <button id="btn-voltar" class="btn secundario" type="button">Voltar</button>
+          <button id="btn-prox" class="btn primario" type="submit">Continuar</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Sucesso -->
+    <section id="sucesso" hidden>
+      <div class="selo" aria-hidden="true">✓</div>
+      <h1>Ocorrência registrada</h1>
+      <p id="sucesso-txt" class="sub"></p>
+      <button id="btn-outra" class="btn primario grande" type="button">Registrar outra</button>
+      <button id="btn-inicio" class="btn texto" type="button">Voltar ao início</button>
+    </section>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
