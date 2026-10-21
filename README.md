@@ -1,4 +1,4 @@
-# Ethos — Frontend do Professor
+# Ethos
 
 Registro rápido de ocorrências escolares · Colégio Santa Maria Minas.
 
