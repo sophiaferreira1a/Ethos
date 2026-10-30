@@ -1,5 +1,7 @@
 package br.com.projeto.ocorrencias.historico;
 
+import java.util.UUID;
+
 /**
  * Contrato unico de registro de historico, usado pelo modulo de ocorrencias (Mateus)
  * e implementado pelo modulo de historico (Bernardo).
@@ -17,5 +19,5 @@ public interface HistoricoService {
      * @param acao         uma constante de {@link AcaoHistorico}
      * @param detalhes     texto livre para auditoria (pode ser {@code null})
      */
-    void registrar(java.util.UUID ocorrenciaId, java.util.UUID usuarioId, String acao, String detalhes);
+    void registrar(UUID ocorrenciaId, UUID usuarioId, String acao, String detalhes);
 }
