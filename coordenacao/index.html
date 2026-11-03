@@ -33,7 +33,7 @@
       <div id="msg-login" class="msg" role="alert" hidden></div>
       <button class="btn primario" type="submit">Entrar</button>
     </form>
-    <p class="sub link-outra-area">É professor? <a href="/">Registrar ocorrência</a></p>
+    <p class="sub link-outra-area">É professor? <a id="ir-professor" href="/">Acessar login do professor</a></p>
   </div>
 </main>
 
@@ -116,7 +116,10 @@
     </section>
 
     <section aria-labelledby="resultado">
-      <p id="resultado" class="resultado" aria-live="polite"></p>
+      <div class="resultado-linha">
+        <p id="resultado" class="resultado" aria-live="polite"></p>
+        <button id="btn-exportar" class="btn secundario pequeno" type="button">Exportar planilha</button>
+      </div>
       <div id="msg-lista" class="msg" role="alert" hidden></div>
 
       <div class="tabela-wrap">

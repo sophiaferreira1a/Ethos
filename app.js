@@ -1,6 +1,6 @@
 /* ===== Configuração ===== */
-const API_URL = "http://localhost:8080"; // produção: URL do backend no Render
-const USAR_MOCK_SE_FALHAR = true;        // backend fora do ar NA ABERTURA da página: usa dados de exemplo (desligar no deploy)
+const API_URL = "https://ethos-api-rpea.onrender.com"; // produção: URL do backend no Render
+const USAR_MOCK_SE_FALHAR = false;       // backend fora do ar NA ABERTURA da página: usa dados de exemplo (desligar no deploy)
 let modoPrevia = false;                  // decidido uma vez, no início; não muda no meio do uso
 
 // v = valor enviado à API (combine os nomes dos enums com o Mateus); l = texto exibido
@@ -266,6 +266,14 @@ function sucesso() {
 $("#btn-nova").onclick = novaOcorrencia;
 $("#btn-outra").onclick = novaOcorrencia;
 $("#btn-inicio").onclick = () => secao("painel");
+
+/* Trocar de área: encerra a sessão atual antes, senão o /me redireciona de volta */
+$("#ir-coordenacao").addEventListener("click", async e => {
+  e.preventDefault();
+  if (!modoPrevia) { try { await api("/logout", {method: "POST"}); } catch {} }
+  sessao.limpar();
+  location.href = "/coordenacao";
+});
 
 /* ===== Início ===== */
 (async function iniciar() {

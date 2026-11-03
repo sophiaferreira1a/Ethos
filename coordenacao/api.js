@@ -1,9 +1,9 @@
 const CONFIG = {
   // Em dev, abra o front em "localhost" (não 127.0.0.1), senão o cookie de sessão não é enviado.
-  API_URL: "http://localhost:8080",
+  API_URL: "https://ethos-api-rpea.onrender.com",
 
   // Sem backend na abertura da página, usa dados fictícios em memória. Desligar (false) no deploy.
-  USAR_MOCK_SE_FALHAR: true,
+  USAR_MOCK_SE_FALHAR: false,
 
   TAMANHO_PAGINA: 20,
 
