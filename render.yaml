@@ -1,0 +1,36 @@
+# Render Blueprint: backend Spring Boot via Docker.
+# Uso: Render -> New -> Blueprint -> aponte para este repositorio.
+# Os segredos (sync: false) sao digitados no painel do Render, nunca aqui.
+services:
+  - type: web
+    name: ethos-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free            # dorme apos inatividade; a 1a requisicao demora (ver docs/DEPLOY.md)
+    region: virginia      # Render nao tem Sao Paulo; Virginia e a mais proxima do Brasil
+    branch: main
+    envVars:
+      # --- Supabase (Session pooler, porta 5432) ---
+      - key: DB_URL
+        sync: false       # jdbc:postgresql://<host-do-pooler>:5432/postgres?sslmode=require
+      - key: DB_USER
+        sync: false       # postgres.<project-ref>
+      - key: DB_PASSWORD
+        sync: false
+
+      # --- Frontend na Vercel ---
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false       # ex.: https://ethos.vercel.app (sem barra no final; varias, separadas por virgula)
+
+      # --- Cookie de sessao: front e API em dominios diferentes, sempre HTTPS ---
+      - key: SESSION_COOKIE_SAME_SITE
+        value: none
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+
+      # --- Opcional: rotas de destino apos o login (defaults em application.properties) ---
+      # - key: REDIRECT_PROFESSOR
+      #   value: /professor
+      # - key: REDIRECT_COORDENACAO
+      #   value: /coordenacao

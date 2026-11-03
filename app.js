@@ -1,6 +1,7 @@
 /* ===== Configuração ===== */
-const API_URL = "https://SEU-BACKEND.exemplo.com.br"; // troque pela URL do backend do colégio
-const USAR_MOCK_SE_FALHAR = true;        // se a API estiver fora do ar, usa dados de exemplo (apenas para desenvolvimento)
+const API_URL = "http://localhost:8080"; // produção: URL do backend no Render
+const USAR_MOCK_SE_FALHAR = true;        // backend fora do ar NA ABERTURA da página: usa dados de exemplo (desligar no deploy)
+let modoPrevia = false;                  // decidido uma vez, no início; não muda no meio do uso
 
 // v = valor enviado à API (combine os nomes dos enums com o Mateus); l = texto exibido
 const TIPOS = [
@@ -37,21 +38,23 @@ const ALUNOS_MOCK = Object.entries(NOMES_MOCK).flatMap(([turma, nomes]) =>
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const mem = {};
+// O login fica no cookie de sessão do backend; aqui só o nome, para exibir.
 const sessao = {
-  get token() { try { return sessionStorage.getItem("token"); } catch { return mem.token || null; } },
   get nome() { try { return sessionStorage.getItem("nome"); } catch { return mem.nome || null; } },
-  salvar(t, n) { mem.token = t; mem.nome = n; try { sessionStorage.setItem("token", t); sessionStorage.setItem("nome", n); } catch {} },
-  limpar() { delete mem.token; delete mem.nome; try { sessionStorage.clear(); } catch {} }
+  salvar(n) { mem.nome = n; try { sessionStorage.setItem("nome", n); } catch {} },
+  limpar() { delete mem.nome; try { sessionStorage.clear(); } catch {} }
 };
+let turmas = [];
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 async function api(caminho, opcoes = {}) {
   const res = await fetch(API_URL + caminho, {
     ...opcoes,
-    headers: {"Content-Type": "application/json", ...(sessao.token ? {Authorization: "Bearer " + sessao.token} : {}), ...opcoes.headers}
+    credentials: "include", // envia o cookie de sessão (JSESSIONID)
+    headers: {"Content-Type": "application/json", ...opcoes.headers}
   });
   const dados = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(dados.mensagem || dados.message || "Erro " + res.status), {status: res.status});
+  if (!res.ok) throw Object.assign(new Error(dados.erro || "Erro " + res.status), {status: res.status, campos: dados.campos});
   return dados;
 }
 const semRede = e => !e.status; // falha de conexão (fetch lançou TypeError)
@@ -73,6 +76,23 @@ function telaApp() {
   $("#nome-prof").textContent = sessao.nome || "";
   $("#saudacao").textContent = primeiro;
   secao("painel");
+  carregarTurmas();
+}
+function sessaoExpirada() { sessao.limpar(); telaLogin(); mostrarMsg($("#msg-login"), "Sua sessão expirou. Entre novamente."); }
+
+async function carregarTurmas() {
+  try {
+    turmas = modoPrevia ? TURMAS_MOCK : (await api("/turmas")).map(t => t.nome);
+  } catch (err) {
+    if (err.status === 401) return sessaoExpirada();
+    turmas = [];
+  }
+  preencherTurmas();
+}
+function preencherTurmas() {
+  const sel = $("#turma"), atual = sel.value;
+  sel.innerHTML = `<option value="">Todas as turmas</option>` + turmas.map(t => `<option>${esc(t)}</option>`).join("");
+  sel.value = atual;
 }
 function secao(id) { ["painel", "wizard", "sucesso"].forEach(s => $("#" + s).hidden = s !== id); window.scrollTo(0, 0); }
 
@@ -88,16 +108,20 @@ $("#form-login").addEventListener("submit", async e => {
 
   const btn = e.submitter; btn.disabled = true; btn.textContent = "Entrando…";
   try {
-    const d = await api("/auth/login", {method: "POST", body: JSON.stringify({email, senha})});
-    if ((d.role || d.perfil) === "COORDENACAO") { mostrarMsg($("#msg-login"), "Esta área é exclusiva para professores."); return; }
-    sessao.salvar(d.token, d.nome || d.usuario?.nome || email);
+    if (modoPrevia) { sessao.salvar("Professor(a) Demo"); telaApp(); return; }
+    const d = await api("/login", {method: "POST", body: JSON.stringify({email, senha})});
+    if (d.role === "COORDENACAO") { location.href = "/coordenacao"; return; }
+    sessao.salvar(d.nome);
     telaApp();
   } catch (err) {
-    if (semRede(err) && USAR_MOCK_SE_FALHAR) { sessao.salvar("mock", "Professor(a) Demo"); telaApp(); }
+    if (semRede(err)) mostrarMsg($("#msg-login"), "Sem conexão com o servidor. Verifique a internet e tente novamente.");
     else mostrarMsg($("#msg-login"), err.status === 401 ? "E-mail ou senha incorretos." : err.message || "Não foi possível entrar. Tente novamente.");
   } finally { btn.disabled = false; btn.textContent = "Entrar"; }
 });
-$("#btn-sair").onclick = () => { sessao.limpar(); $("#form-login").reset(); telaLogin(); };
+$("#btn-sair").onclick = async () => {
+  if (!modoPrevia) { try { await api("/logout", {method: "POST"}); } catch {} }
+  sessao.limpar(); $("#form-login").reset(); telaLogin();
+};
 
 /* ===== Formulário em passos ===== */
 const TOTAL = 5;
@@ -107,7 +131,7 @@ const estado = {aluno: null, tipo: "", descricao: "", medidas: []};
 function montarOpcoes() {
   $("#tipos").innerHTML = TIPOS.map(t => `<label class="op"><input type="radio" name="tipo" value="${t.v}">${esc(t.l)}</label>`).join("");
   $("#medidas").innerHTML = MEDIDAS.map(m => `<label class="op"><input type="checkbox" name="medida" value="${esc(m)}">${esc(m)}</label>`).join("");
-  $("#turma").innerHTML = `<option value="">Todas as turmas</option>` + TURMAS_MOCK.map(t => `<option>${esc(t)}</option>`).join("");
+  preencherTurmas();
 }
 
 function novaOcorrencia() {
@@ -138,19 +162,25 @@ let timer;
 $("#busca").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(buscarAlunos, 250); });
 $("#turma").addEventListener("change", buscarAlunos);
 
+let pedidoBusca = 0; // descarta respostas de buscas antigas que cheguem atrasadas
 async function buscarAlunos() {
   const q = $("#busca").value.trim(), turma = $("#turma").value, ul = $("#lista-alunos");
+  const pedido = ++pedidoBusca;
   if (!q && !turma) { ul.innerHTML = ""; return; }
   let alunos;
-  try {
-    const p = new URLSearchParams({busca: q, turma});
-    alunos = await api("/alunos?" + p);
-  } catch (err) {
-    if (semRede(err) && USAR_MOCK_SE_FALHAR) {
-      const n = s => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      alunos = ALUNOS_MOCK.filter(a => (!turma || a.turma === turma) && (!q || n(a.nome).includes(n(q)) || a.matricula.includes(q)));
-    } else { ul.innerHTML = `<li class="vazio">Não foi possível buscar alunos.</li>`; return; }
+  if (modoPrevia) {
+    const n = s => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    alunos = ALUNOS_MOCK.filter(a => (!turma || a.turma === turma) && (!q || n(a.nome).includes(n(q))));
+  } else {
+    try {
+      alunos = await api("/alunos?" + new URLSearchParams({busca: q, turma}));
+    } catch (err) {
+      if (pedido !== pedidoBusca) return;
+      if (err.status === 401) return sessaoExpirada();
+      ul.innerHTML = `<li class="vazio">Não foi possível buscar alunos.</li>`; return;
+    }
   }
+  if (pedido !== pedidoBusca) return;
   ul.innerHTML = alunos.length
     ? alunos.map(a => `<li class="item" role="option" tabindex="0" data-id="${a.id}"><span>${esc(a.nome)}</span><small>${esc(a.turma)}</small></li>`).join("")
     : `<li class="vazio">Nenhum aluno encontrado.</li>`;
@@ -220,11 +250,11 @@ async function enviar(btn) {
   };
   btn.disabled = true; btn.textContent = "Enviando…";
   try {
-    await api("/ocorrencias", {method: "POST", body: JSON.stringify(corpo)});
+    if (modoPrevia) console.info("Prévia — payload:", corpo);
+    else await api("/ocorrencias", {method: "POST", body: JSON.stringify(corpo)});
     sucesso();
   } catch (err) {
-    if (semRede(err) && USAR_MOCK_SE_FALHAR) { console.info("Mock — payload:", corpo); return sucesso(); }
-    if (err.status === 401) { sessao.limpar(); telaLogin(); return; }
+    if (err.status === 401) return sessaoExpirada();
     mostrarMsg($("#msg-oc"), err.status ? `Não foi possível salvar: ${err.message}` : "Sem conexão com o servidor. Verifique a internet e tente novamente.");
   } finally { btn.disabled = false; btn.textContent = passo === TOTAL ? "Enviar ocorrência" : "Continuar"; }
 }
@@ -238,6 +268,21 @@ $("#btn-outra").onclick = novaOcorrencia;
 $("#btn-inicio").onclick = () => secao("painel");
 
 /* ===== Início ===== */
-$("#dica").hidden = !USAR_MOCK_SE_FALHAR;
-sessao.token ? telaApp() : telaLogin();
+(async function iniciar() {
+  try {
+    const u = await api("/me");
+    if (u.role === "COORDENACAO") { location.href = "/coordenacao"; return; }
+    sessao.salvar(u.nome);
+    telaApp();
+  } catch (err) {
+    if (semRede(err) && USAR_MOCK_SE_FALHAR) {
+      modoPrevia = true;
+      $("#dica").hidden = false;
+      sessao.nome ? telaApp() : telaLogin();
+    } else {
+      sessao.limpar();
+      telaLogin();
+    }
+  }
+})();
 

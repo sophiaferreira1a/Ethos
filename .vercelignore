@@ -1,0 +1,15 @@
+# A Vercel publica so o frontend estatico (index.html, app.js, style.css, assets/).
+# O backend Java e os arquivos de deploy do Render ficam de fora.
+src/
+.mvn/
+mvnw
+mvnw.cmd
+pom.xml
+target/
+docs/
+Dockerfile
+.dockerignore
+render.yaml
+docker-compose.test.yml
+.env
+.env.*

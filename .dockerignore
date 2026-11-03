@@ -1,0 +1,35 @@
+# Fora da imagem: git, build local, segredos, IDE e o frontend estatico (vai pela Vercel).
+.git
+.gitignore
+.gitattributes
+.github
+
+target/
+build/
+
+.env
+.env.*
+
+.idea/
+.vscode/
+*.iml
+
+# Frontend estatico (Vercel)
+index.html
+app.js
+style.css
+assets/
+
+# Documentacao e configs de outras plataformas
+docs/
+README.md
+LICENSE
+render.yaml
+vercel.json
+.vercelignore
+docker-compose.test.yml
+Dockerfile
+.dockerignore
+
+# Nao e usado no Linux do container
+mvnw.cmd

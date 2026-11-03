@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ethos · Coordenação · Colégio Santa Maria Minas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Caminhos absolutos: na Vercel a página abre em /coordenacao, sem barra final -->
+<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="/coordenacao/coordenacao.css">
+</head>
+<body class="coord">
+
+<div id="tela-carregando" class="tela carregando" aria-busy="true">
+  <p class="sub">Carregando…</p>
+</div>
+
+<main id="tela-login" class="tela" hidden>
+  <div class="login-card">
+    <img class="logo-login" src="/assets/logo-santa-maria.png" alt="Colégio Santa Maria Minas">
+    <h1>Ethos</h1>
+    <p class="sub" style="margin:-.5rem 0 .5rem">Acompanhamento de ocorrências · Acesso da coordenação</p>
+    <form id="form-login" novalidate>
+      <label for="email">E-mail</label>
+      <input id="email" type="email" autocomplete="username" inputmode="email" placeholder="nome@escola.com.br">
+      <small class="erro" data-erro="email"></small>
+
+      <label for="senha">Senha</label>
+      <input id="senha" type="password" autocomplete="current-password">
+      <small class="erro" data-erro="senha"></small>
+
+      <div id="msg-login" class="msg" role="alert" hidden></div>
+      <button class="btn primario" type="submit">Entrar</button>
+    </form>
+    <p class="sub link-outra-area">É professor? <a href="/">Registrar ocorrência</a></p>
+  </div>
+</main>
+
+<div id="tela-app" class="tela" hidden>
+  <header class="topo">
+    <div class="topo-marca">
+      <img class="logo-topo" src="/assets/brasao.png" alt=""><span class="marca">Ethos</span>
+      <span class="sub area">Coordenação</span>
+    </div>
+    <div class="topo-usuario">
+      <span id="nome-usuario" class="sub"></span>
+      <button id="btn-sair" class="btn texto" type="button">Sair</button>
+    </div>
+  </header>
+
+  <main class="painel-coord">
+    <section class="cabecalho">
+      <h1>Ocorrências</h1>
+      <p class="sub">Acompanhe o que ainda precisa ser lançado no sistema oficial do colégio.</p>
+    </section>
+
+    <section class="fila" aria-label="Situação das ocorrências">
+      <button class="fila-item pendente" type="button" data-status="NAO_LANCADA" aria-pressed="true">
+        <span class="fila-num" id="ind-nao">–</span>
+        <span class="fila-txt">Não lançadas</span>
+      </button>
+      <button class="fila-item" type="button" data-status="LANCADA" aria-pressed="false">
+        <span class="fila-num" id="ind-lancadas">–</span>
+        <span class="fila-txt">Lançadas</span>
+      </button>
+      <button class="fila-item" type="button" data-status="" aria-pressed="false">
+        <span class="fila-num" id="ind-total">–</span>
+        <span class="fila-txt">Total</span>
+      </button>
+    </section>
+
+    <section class="filtros-area" aria-label="Busca e filtros">
+      <div class="busca">
+        <label for="f-aluno" class="sr">Buscar aluno</label>
+        <input id="f-aluno" type="search" autocomplete="off" placeholder="Buscar aluno pelo nome">
+      </div>
+      <details id="filtros" class="filtros">
+        <summary>Filtros <span id="filtros-ativos" class="contagem" hidden></span></summary>
+        <div class="filtros-grade">
+          <div>
+            <label for="f-turma">Turma</label>
+            <select id="f-turma"><option value="">Todas</option></select>
+          </div>
+          <div>
+            <label for="f-tipo">Tipo</label>
+            <select id="f-tipo"><option value="">Todos</option></select>
+          </div>
+          <div>
+            <label for="f-status">Situação</label>
+            <select id="f-status">
+              <option value="">Todas</option>
+              <option value="NAO_LANCADA">Não lançada</option>
+              <option value="LANCADA">Lançada</option>
+            </select>
+          </div>
+          <div>
+            <label for="f-inicio">De</label>
+            <input id="f-inicio" type="date">
+          </div>
+          <div>
+            <label for="f-fim">Até</label>
+            <input id="f-fim" type="date">
+          </div>
+          <div>
+            <label for="f-ordem">Ordem</label>
+            <select id="f-ordem">
+              <option value="data,desc">Mais recentes</option>
+              <option value="data,asc">Mais antigas</option>
+            </select>
+          </div>
+        </div>
+        <small class="erro" data-erro="periodo"></small>
+        <button id="btn-limpar" class="btn texto" type="button">Limpar filtros</button>
+      </details>
+    </section>
+
+    <section aria-labelledby="resultado">
+      <p id="resultado" class="resultado" aria-live="polite"></p>
+      <div id="msg-lista" class="msg" role="alert" hidden></div>
+
+      <div class="tabela-wrap">
+        <table class="tabela" id="tabela">
+          <caption class="sr">Ocorrências registradas pelos professores</caption>
+          <thead>
+            <tr>
+              <th scope="col">Data</th>
+              <th scope="col">Aluno</th>
+              <th scope="col">Tipo</th>
+              <th scope="col">Professor</th>
+              <th scope="col">Situação</th>
+              <th scope="col"><span class="sr">Ações</span></th>
+            </tr>
+          </thead>
+          <tbody id="linhas"></tbody>
+        </table>
+      </div>
+
+      <div id="vazio" class="vazio-lista" hidden>
+        <p id="vazio-txt"></p>
+        <button id="vazio-limpar" class="btn secundario" type="button" hidden>Limpar filtros</button>
+      </div>
+
+      <nav class="paginacao" id="paginacao" aria-label="Paginação" hidden>
+        <button id="pag-ant" class="btn secundario pequeno" type="button">Anterior</button>
+        <span id="pag-info" class="sub"></span>
+        <button id="pag-prox" class="btn secundario pequeno" type="button">Próxima</button>
+      </nav>
+    </section>
+  </main>
+</div>
+
+<dialog id="dlg-detalhe" class="gaveta" aria-labelledby="det-titulo">
+  <div class="gaveta-topo">
+    <div>
+      <h2 id="det-titulo">Ocorrência</h2>
+      <p id="det-sub" class="sub"></p>
+    </div>
+    <button class="fechar" type="button" data-fechar aria-label="Fechar">✕</button>
+  </div>
+  <div id="det-corpo" class="gaveta-corpo"></div>
+</dialog>
+
+<dialog id="dlg-confirmar" class="confirmar" aria-labelledby="conf-titulo">
+  <form method="dialog">
+    <h2 id="conf-titulo"></h2>
+    <p id="conf-texto"></p>
+    <div class="confirmar-acoes">
+      <button class="btn secundario" value="nao" type="submit">Cancelar</button>
+      <button id="conf-sim" class="btn primario" value="sim" type="submit"></button>
+    </div>
+  </form>
+</dialog>
+
+<div id="aviso" class="aviso" role="status" aria-live="polite" hidden></div>
+
+<script src="/coordenacao/api.js"></script>
+<script src="/coordenacao/coordenacao.js"></script>
+</body>
+</html>
