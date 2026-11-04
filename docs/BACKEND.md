@@ -21,7 +21,7 @@ Criados pela migration `V30__seed_usuarios_dev.sql`. Senha de todos: `Ocorrencia
 
 | E-mail | Perfil |
 |---|---|
-| coordenacao@escola.com | COORDENACAO |
+| marcia@santamaria.com | COORDENACAO |
 | professor@escola.com | PROFESSOR |
 | professor2@escola.com | PROFESSOR |
 
