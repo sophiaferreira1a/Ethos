@@ -15,14 +15,17 @@
   <div class="login-card">
     <img class="logo-login" src="assets/logo-santa-maria.png" alt="Colégio Santa Maria Minas">
     <h1>Ethos</h1>
-    <p class="sub" style="margin:-.5rem 0 .5rem">Registro de ocorrências · Acesso do professor</p>
+    <p class="sub" style="margin:-.5rem 0 .5rem">Registro de ocorrências - Acesso do professor</p>
     <form id="form-login" novalidate>
       <label for="email">E-mail</label>
       <input id="email" type="email" autocomplete="username" inputmode="email" placeholder="nome@escola.com.br">
       <small class="erro" data-erro="email"></small>
 
       <label for="senha">Senha</label>
-      <input id="senha" type="password" autocomplete="current-password">
+      <div class="senha-campo">
+        <input id="senha" type="password" autocomplete="current-password">
+        <button type="button" id="btn-senha" class="btn-senha" aria-controls="senha">Mostrar senha</button>
+      </div>
       <small class="erro" data-erro="senha"></small>
 
       <p id="dica" class="sub" style="margin-top:1rem" hidden>Prévia: use qualquer e-mail válido e senha com 4+ caracteres.</p>
@@ -135,5 +138,6 @@
 </div>
 
 <script src="app.js"></script>
+<script src="senha.js"></script>
 </body>
 </html>

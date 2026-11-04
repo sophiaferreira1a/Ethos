@@ -25,6 +25,7 @@ Criados pela migration `V30__seed_usuarios_dev.sql`. Senha de todos: `Ocorrencia
 | professor@escola.com | PROFESSOR |
 | professor2@escola.com | PROFESSOR |
 
+
 ## Login (sessão por cookie)
 
 ```js

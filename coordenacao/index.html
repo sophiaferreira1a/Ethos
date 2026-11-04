@@ -27,7 +27,10 @@
       <small class="erro" data-erro="email"></small>
 
       <label for="senha">Senha</label>
-      <input id="senha" type="password" autocomplete="current-password">
+      <div class="senha-campo">
+        <input id="senha" type="password" autocomplete="current-password">
+        <button type="button" id="btn-senha" class="btn-senha" aria-controls="senha">Mostrar senha</button>
+      </div>
       <small class="erro" data-erro="senha"></small>
 
       <div id="msg-login" class="msg" role="alert" hidden></div>
@@ -179,5 +182,6 @@
 
 <script src="/coordenacao/api.js"></script>
 <script src="/coordenacao/coordenacao.js"></script>
+<script src="/senha.js"></script>
 </body>
 </html>
