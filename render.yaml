@@ -20,8 +20,9 @@ services:
         sync: false
 
       # --- Frontend na Vercel ---
+      # Origem exata, sem barra no final. Ajuste se o dominio da Vercel mudar.
       - key: CORS_ALLOWED_ORIGINS
-        sync: false       # ex.: https://ethos.vercel.app (sem barra no final; varias, separadas por virgula)
+        value: "https://ethos-santamaria.vercel.app"
 
       # --- Cookie de sessao: a Vercel faz proxy /api, entao o front e a API
       # ficam no mesmo dominio; o cookie pode ser Lax. Sempre HTTPS no Render. ---

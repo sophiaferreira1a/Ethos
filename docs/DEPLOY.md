@@ -37,7 +37,7 @@ Nada disto vai para o GitHub. No Render: *Environment* do serviço (ou o prompt 
 
 ## 2. Render (backend)
 
-**Com Blueprint (recomendado):** Render → *New* → *Blueprint* → escolha o repositório → o `render.yaml` cria o serviço `ethos-api` → preencha `DB_URL`, `DB_USER`, `DB_PASSWORD` e `CORS_ALLOWED_ORIGINS`.
+**Com Blueprint (recomendado):** Render → *New* → *Blueprint* → escolha o repositório → o `render.yaml` cria o serviço `ethos-api` → preencha `DB_URL`, `DB_USER` e `DB_PASSWORD` (o CORS já vem com `https://ethos-santamaria.vercel.app`; ajuste se o domínio da Vercel mudar).
 
 > Se o nome `ethos-api` já estiver em uso no Render, o serviço receberá outro subdomínio. Copie a URL final e ajuste o `destination` do rewrite em `vercel.json`.
 
@@ -62,9 +62,9 @@ docker run --rm -p 8080:8080 `
 1. *Add New Project* → importe o repositório.
 2. *Framework Preset*: **Other**. *Build Command* e *Output Directory*: deixe em branco (site estático na raiz).
 3. O `.vercelignore` deixa o backend Java de fora do upload.
-4. Em `vercel.json`, ajuste o `destination` do rewrite `/api/:path*` para a URL do seu serviço Render (o exemplo usa `https://ethos-api.onrender.com`). O `app.js` e o `coordenacao/api.js` já usam `/api` automaticamente fora do localhost.
+4. Em `vercel.json`, o `destination` do rewrite `/api/:path*` já aponta para `https://ethos-api-h79m.onrender.com`. Se o serviço Render mudar de URL, ajuste aqui. O `app.js` e o `coordenacao/api.js` já usam `/api` automaticamente fora do localhost.
 5. Use o domínio gratuito `https://<projeto>.vercel.app`. **Não use `ethos.com`**: esse domínio pertence a outra empresa e não pode ser verificado por este projeto.
-6. Copie a URL final da Vercel para `CORS_ALLOWED_ORIGINS` no Render (a Vercel pode repassar o header `Origin` ao backend).
+6. Se o domínio da Vercel mudar, copie a URL final para `CORS_ALLOWED_ORIGINS` no Render (a Vercel pode repassar o header `Origin` ao backend). Neste deploy: `https://ethos-santamaria.vercel.app`.
 
 > Se o front e o back forem para repositórios/pastas separados, ajuste o *Root Directory* da Vercel e remova o `.vercelignore`.
 

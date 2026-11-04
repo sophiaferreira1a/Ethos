@@ -5,7 +5,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://ethos-api-rpea.onrender.com/:path*"
+      "destination": "https://ethos-api-h79m.onrender.com/:path*"
     }
   ],
   "headers": [
