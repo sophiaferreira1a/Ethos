@@ -119,6 +119,64 @@ $("#btn-sair").addEventListener("click", async () => {
   telaLogin();
 });
 
+$("#ir-professor").addEventListener("click", async e => {
+  e.preventDefault();
+  try { await Api.logout(); } catch {}
+  location.href = "/";
+});
+
+/* ===== Exportar planilha (CSV aberto direto no Excel) ===== */
+const exportData = d => d ? String(d).slice(0, 10).split("-").reverse().join("/") : "";
+const exportDataHora = d => {
+  if (!d) return "";
+  const x = new Date(d);
+  return isNaN(x) ? String(d) : x.toLocaleString("pt-BR");
+};
+// Aspas duplicadas e proteção contra fórmulas (=, +, -, @) ao abrir no Excel
+const celulaCsv = v => {
+  let t = String(v ?? "").replace(/\r?\n/g, " ").trim();
+  if (/^[=+\-@]/.test(t)) t = "'" + t;
+  return '"' + t.replace(/"/g, '""') + '"';
+};
+
+$("#btn-exportar").addEventListener("click", async e => {
+  const btn = e.currentTarget, textoOriginal = btn.textContent;
+  btn.disabled = true; btn.textContent = "Gerando…";
+  mostrarMsg($("#msg-lista"), "");
+  try {
+    // Busca TODAS as páginas do filtro atual (não só a que está na tela)
+    const todos = [];
+    let pagina = 0, totalPaginas = 1;
+    while (pagina < totalPaginas) {
+      const r = await Api.listar(ui.filtros, pagina, ui.ordem, 200);
+      todos.push(...r.itens);
+      totalPaginas = r.totalPaginas;
+      pagina++;
+    }
+    if (!todos.length) { mostrarMsg($("#msg-lista"), "Não há ocorrências para exportar com os filtros atuais."); return; }
+
+    const cabecalho = ["Data", "Aluno", "Turma", "Tipo", "Professor", "Descrição", "Medidas tomadas",
+      "Situação", "Data do lançamento", "Responsável pelo lançamento", "Registrada em"];
+    const linhas = todos.map(o => [
+      exportData(o.data), o.aluno.nome, o.turma, rotuloTipo(o.tipo), o.professor, o.descricao, o.medidasTomadas,
+      o.status === "LANCADA" ? "Lançada" : "Não lançada",
+      exportDataHora(o.dataLancamento), o.responsavelLancamento, exportDataHora(o.criadoEm)
+    ]);
+    // ";" como separador e BOM UTF-8: o Excel em português abre em colunas e com acentos corretos
+    const csv = "\uFEFF" + [cabecalho, ...linhas].map(l => l.map(celulaCsv).join(";")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], {type: "text/csv;charset=utf-8"}));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ocorrencias-${new Date().toLocaleDateString("sv-SE")}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (err) {
+    if (!tratarErroGlobal(err)) mostrarMsg($("#msg-lista"), "Não foi possível exportar: " + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = textoOriginal;
+  }
+});
+
 let filtrosProntos = false;
 async function prepararFiltros() {
   if (filtrosProntos) return;

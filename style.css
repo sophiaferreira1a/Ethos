@@ -90,3 +90,6 @@ legend{font-size:1.5rem;font-weight:700;letter-spacing:-.015em;margin-bottom:.5r
 @keyframes pop{from{transform:scale(.4);opacity:0}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
+
+.link-outra-area{margin-top:1.25rem;text-align:center}
+.link-outra-area a{color:var(--tinta);font-weight:600}

@@ -277,6 +277,14 @@ $("#btn-nova").onclick = novaOcorrencia;
 $("#btn-outra").onclick = novaOcorrencia;
 $("#btn-inicio").onclick = () => secao("painel");
 
+/* Trocar de área: encerra a sessão atual antes, senão o /me redireciona de volta */
+$("#ir-coordenacao").addEventListener("click", async e => {
+  e.preventDefault();
+  if (!modoPrevia) { try { await api("/logout", {method: "POST"}); } catch {} }
+  sessao.limpar();
+  location.href = "/coordenacao";
+});
+
 /* ===== Início ===== */
 (async function iniciar() {
   try {
