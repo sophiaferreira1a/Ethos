@@ -67,6 +67,7 @@ class OcorrenciaControllerTest {
                 .andExpect(jsonPath("$.alunoNome").value("Ana Clara Souza"))
                 .andExpect(jsonPath("$.turmaNome").value("6A"))
                 .andExpect(jsonPath("$.statusLancamento").value("NAO_LANCADA"))
+                .andExpect(jsonPath("$.medidasSugeridas").value("Suspensão"))
                 .andExpect(jsonPath("$.tipo").value("INDISCIPLINA"));
     }
 
@@ -227,6 +228,7 @@ class OcorrenciaControllerTest {
                   "tipo": "INDISCIPLINA",
                   "descricao": "Aluno interrompeu a aula varias vezes.",
                   "medidasTomadas": "Conversa com o aluno",
+                  "medidasSugeridas": "Suspensão",
                   "data": "2026-10-30"
                 }
                 """;
@@ -244,6 +246,7 @@ class OcorrenciaControllerTest {
                 TipoOcorrencia.INDISCIPLINA,
                 "Aluno interrompeu a aula varias vezes.",
                 "Conversa com o aluno",
+                "Suspensão",
                 LocalDate.of(2026, 10, 30),
                 StatusLancamento.NAO_LANCADA,
                 null,

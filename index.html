@@ -46,7 +46,7 @@
     <!-- Painel inicial -->
     <section id="painel">
       <h1>Olá, <span id="saudacao"></span></h1>
-      <p class="sub">Registre uma ocorrência em até 5 passos rápidos.</p>
+      <p class="sub">Registre uma ocorrência em até 6 passos rápidos.</p>
       <button id="btn-nova" class="btn primario grande" type="button">Nova ocorrência</button>
     </section>
 
@@ -88,7 +88,7 @@
           <small class="erro" data-erro="data"></small>
         </fieldset>
 
-        <!-- 4: medidas -->
+        <!-- 4: medidas do professor -->
         <fieldset class="passo" data-passo="4" hidden>
           <legend>Quais medidas foram tomadas?</legend>
           <div id="medidas" class="opcoes multi"></div>
@@ -97,8 +97,18 @@
           <small class="erro" data-erro="medidas"></small>
         </fieldset>
 
-        <!-- 5: revisão -->
+        <!-- 5: sugestão de medidas -->
         <fieldset class="passo" data-passo="5" hidden>
+          <legend>O que você sugere à coordenação? (opcional)</legend>
+          <p class="sub">Se quiser, selecione as providências que, na sua avaliação, cabem à coordenação.</p>
+          <div id="sugestoes" class="opcoes multi"></div>
+          <label for="sugestao-outra">Outra sugestão (opcional)</label>
+          <input id="sugestao-outra" type="text" maxlength="200">
+          <small class="erro" data-erro="sugestoes"></small>
+        </fieldset>
+
+        <!-- 6: revisão -->
+        <fieldset class="passo" data-passo="6" hidden>
           <legend>Revise e envie</legend>
           <dl id="resumo" class="resumo"></dl>
         </fieldset>

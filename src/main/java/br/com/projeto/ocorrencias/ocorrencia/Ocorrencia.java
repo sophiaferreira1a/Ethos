@@ -66,6 +66,10 @@ public class Ocorrencia {
     @Column(name = "medidas_tomadas", columnDefinition = "text")
     private String medidasTomadas;
 
+    @JdbcTypeCode(SqlTypes.LONGVARCHAR)
+    @Column(name = "medidas_sugeridas", columnDefinition = "text")
+    private String medidasSugeridas;
+
     @Column(nullable = false)
     private LocalDate data;
 
@@ -91,13 +95,15 @@ public class Ocorrencia {
     }
 
     public Ocorrencia(Aluno aluno, Usuario professor, TipoOcorrencia tipo,
-                      String descricao, String medidasTomadas, LocalDate data) {
+                      String descricao, String medidasTomadas, String medidasSugeridas,
+                      LocalDate data) {
         this.aluno = aluno;
         this.turma = aluno.getTurma();
         this.professor = professor;
         this.tipo = tipo;
         this.descricao = descricao;
         this.medidasTomadas = medidasTomadas;
+        this.medidasSugeridas = medidasSugeridas;
         this.data = data;
         this.statusLancamento = StatusLancamento.NAO_LANCADA;
     }
@@ -113,13 +119,14 @@ public class Ocorrencia {
     }
 
     public void atualizar(Aluno aluno, TipoOcorrencia tipo, String descricao,
-                          String medidasTomadas, LocalDate data) {
+                          String medidasTomadas, String medidasSugeridas, LocalDate data) {
         exigirAindaNaoLancada();
         this.aluno = aluno;
         this.turma = aluno.getTurma();
         this.tipo = tipo;
         this.descricao = descricao;
         this.medidasTomadas = medidasTomadas;
+        this.medidasSugeridas = medidasSugeridas;
         this.data = data;
     }
 
@@ -191,6 +198,10 @@ public class Ocorrencia {
 
     public String getMedidasTomadas() {
         return medidasTomadas;
+    }
+
+    public String getMedidasSugeridas() {
+        return medidasSugeridas;
     }
 
     public LocalDate getData() {

@@ -25,6 +25,7 @@ class OcorrenciaTest {
         assertThat(ocorrencia.getDataLancamento()).isNull();
         assertThat(ocorrencia.getResponsavelLancamento()).isNull();
         assertThat(ocorrencia.getTurma().getNome()).isEqualTo("6A");
+        assertThat(ocorrencia.getMedidasSugeridas()).isEqualTo("Suspensão");
     }
 
     @Test
@@ -106,7 +107,8 @@ class OcorrenciaTest {
         ReflectionTestUtils.setField(aluno, "id", UUID.randomUUID());
         Usuario professor = usuario("Maria Silva", "professor@escola.com", Role.PROFESSOR);
         return new Ocorrencia(aluno, professor, TipoOcorrencia.INDISCIPLINA,
-                "Aluno interrompeu a aula varias vezes.", "Conversa com o aluno", LocalDate.of(2026, 10, 30));
+                "Aluno interrompeu a aula varias vezes.", "Conversa com o aluno",
+                "Suspensão", LocalDate.of(2026, 10, 30));
     }
 
     private static Usuario usuario(String nome, String email, Role role) {

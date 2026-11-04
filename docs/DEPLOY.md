@@ -1,14 +1,14 @@
 # Deploy — Supabase + Render + Vercel
 
 ```
-Navegador ──► Vercel (frontend estático) ──fetch──► Render (Spring Boot, Docker) ──JDBC──► Supabase (PostgreSQL)
+Navegador ──► Vercel (frontend estático) ──/api (rewrite)──► Render (Spring Boot, Docker) ──JDBC──► Supabase (PostgreSQL)
 ```
 
 | Peça | Onde | Arquivo |
 |---|---|---|
 | Banco | Supabase (região São Paulo, **Session pooler** porta 5432) | `db/migration/*` (Flyway roda no boot do backend) |
 | Backend | Render, via Docker (Java 25) | `Dockerfile`, `.dockerignore`, `render.yaml` |
-| Frontend | Vercel, site estático | `vercel.json`, `.vercelignore` |
+| Frontend | Vercel, site estático com proxy `/api` | `vercel.json`, `.vercelignore` |
 
 ## Variáveis de ambiente (Render)
 
@@ -19,9 +19,9 @@ Nada disto vai para o GitHub. No Render: *Environment* do serviço (ou o prompt 
 | `DB_URL` | `jdbc:postgresql://<host-do-pooler>:5432/postgres?sslmode=require` | Supabase → Connect → **Session pooler**. Não use a conexão direta (IPv6) nem a porta 6543. |
 | `DB_USER` | `postgres.<project-ref>` | |
 | `DB_PASSWORD` | senha do banco | |
-| `CORS_ALLOWED_ORIGINS` | `https://<seu-front>.vercel.app` | Origem exata, **sem barra no final**. Várias: separadas por vírgula. |
-| `SESSION_COOKIE_SAME_SITE` | `none` | Front e API em domínios diferentes. Já vem no `render.yaml`. |
-| `SESSION_COOKIE_SECURE` | `true` | Obrigatório com `SameSite=None`. Já vem no `render.yaml`. |
+| `CORS_ALLOWED_ORIGINS` | `https://<seu-front>.vercel.app` | Configure mesmo com o proxy: a Vercel pode repassar o header `Origin` ao Render. Origem exata, **sem barra no final**. Várias: separadas por vírgula. |
+| `SESSION_COOKIE_SAME_SITE` | `lax` | Com o proxy `/api`, navegador e API ficam no mesmo domínio. Já vem no `render.yaml`. |
+| `SESSION_COOKIE_SECURE` | `true` | Obrigatório em produção HTTPS. Já vem no `render.yaml`. |
 | `PORT` | — | O Render injeta sozinho. |
 | `JAVA_OPTS` | opcional | Padrão da imagem: `-XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError`. |
 | `REDIRECT_PROFESSOR` / `REDIRECT_COORDENACAO` | opcional | Rotas pós-login (defaults em `application.properties`). |
@@ -38,6 +38,8 @@ Nada disto vai para o GitHub. No Render: *Environment* do serviço (ou o prompt 
 ## 2. Render (backend)
 
 **Com Blueprint (recomendado):** Render → *New* → *Blueprint* → escolha o repositório → o `render.yaml` cria o serviço `ethos-api` → preencha `DB_URL`, `DB_USER`, `DB_PASSWORD` e `CORS_ALLOWED_ORIGINS`.
+
+> Se o nome `ethos-api` já estiver em uso no Render, o serviço receberá outro subdomínio. Copie a URL final e ajuste o `destination` do rewrite em `vercel.json`.
 
 **Manual:** *New* → *Web Service* → *Language: Docker* → branch `main` → mesmas variáveis da tabela acima.
 
@@ -60,30 +62,43 @@ docker run --rm -p 8080:8080 `
 1. *Add New Project* → importe o repositório.
 2. *Framework Preset*: **Other**. *Build Command* e *Output Directory*: deixe em branco (site estático na raiz).
 3. O `.vercelignore` deixa o backend Java de fora do upload.
-4. Em `app.js`, troque `API_URL` pela URL do Render (`https://ethos-api.onrender.com`). Depois copie a URL final da Vercel para `CORS_ALLOWED_ORIGINS` no Render.
+4. Em `vercel.json`, ajuste o `destination` do rewrite `/api/:path*` para a URL do seu serviço Render (o exemplo usa `https://ethos-api.onrender.com`). O `app.js` e o `coordenacao/api.js` já usam `/api` automaticamente fora do localhost.
+5. Use o domínio gratuito `https://<projeto>.vercel.app`. **Não use `ethos.com`**: esse domínio pertence a outra empresa e não pode ser verificado por este projeto.
+6. Copie a URL final da Vercel para `CORS_ALLOWED_ORIGINS` no Render (a Vercel pode repassar o header `Origin` ao backend).
 
 > Se o front e o back forem para repositórios/pastas separados, ajuste o *Root Directory* da Vercel e remova o `.vercelignore`.
 
-### Cookie de sessão entre domínios (atenção)
+### Sessão via proxy (padrão)
 
-O login usa cookie `JSESSIONID`. Com front em `*.vercel.app` e API em `*.onrender.com`, é um cookie **de terceiros**: precisa de `SameSite=None; Secure` (já configurado) **e** de `credentials: "include"` em todo `fetch` do front. Alguns navegadores (Safari/iOS, Chrome em modo restrito) bloqueiam cookie de terceiros mesmo assim.
+O login usa cookie `JSESSIONID`. O front na Vercel chama `/api`, e a Vercel repassa para o Render. Para o navegador, tudo é o mesmo domínio (`*.vercel.app`), então o cookie não é bloqueado como cookie de terceiros. O `app.js` e o `coordenacao/api.js` já detectam produção e usam `/api`.
 
-Se o login "funcionar mas a sessão não persistir" em algum aparelho, a saída robusta é fazer o navegador falar só com a Vercel e deixar a Vercel repassar para o Render (cookie passa a ser do mesmo domínio). Em `vercel.json`:
+Configuração correspondente no Render:
 
-```json
-"rewrites": [
-  { "source": "/api/:path*", "destination": "https://<seu-servico>.onrender.com/:path*" }
-]
-```
+- `SESSION_COOKIE_SAME_SITE=lax`
+- `SESSION_COOKIE_SECURE=true`
+- `CORS_ALLOWED_ORIGINS` com a URL da Vercel (a Vercel pode repassar o `Origin` ao Render).
 
-e o front passa a usar `API_URL = "/api"`. Nesse modo o CORS deixa de ser necessário e `SESSION_COOKIE_SAME_SITE` pode voltar para `lax`. É uma decisão do time (muda o `API_URL` do Pedro e do Francisco); por isso **não** está ligado por padrão.
+O `fetch` do front continua usando `credentials: "include"`, o que é inofensivo no modo proxy.
+
+### Modo direto (alternativa, sem proxy)
+
+Se em algum momento o front chamar o Render diretamente (`https://<servico>.onrender.com`), será um cookie de terceiros. Nesse caso:
+
+- `SESSION_COOKIE_SAME_SITE=none`
+- `SESSION_COOKIE_SECURE=true`
+- `CORS_ALLOWED_ORIGINS` com a URL exata da Vercel
+- remover/ignorar o rewrite de `/api` e apontar `API_URL` para o Render no código.
+
+Alguns navegadores (Safari/iOS, Chrome em modo restrito) podem bloquear cookies de terceiros mesmo com essa configuração; por isso o proxy é o caminho recomendado.
 
 ## Antes de cada apresentação
 
 - [ ] Supabase: projeto ativo (o plano gratuito pausa por inatividade, ~1 semana). Abra o painel e confira.
-- [ ] Render: o plano gratuito "dorme". **Acorde o serviço 2–3 min antes** abrindo `/indicadores` (a primeira resposta demora ~30–60 s).
+- [ ] Render: o plano gratuito "dorme". **Acorde o serviço 2–3 min antes** abrindo a URL direta do Render (`https://<servico>.onrender.com/indicadores`), não pelo proxy da Vercel (a primeira resposta demora ~30–60 s e pode estourar o timeout do proxy).
 - [ ] Login de teste com `coordenacao@escola.com` e `professor@escola.com`.
-- [ ] `CORS_ALLOWED_ORIGINS` contém a URL exata da Vercel (inclusive se houver domínio de preview/produção diferentes).
+- [ ] O rewrite `/api/:path*` de `vercel.json` aponta para o serviço Render correto.
+- [ ] `CORS_ALLOWED_ORIGINS` contém a URL exata da Vercel (sem `/` no final).
+- [ ] `SESSION_COOKIE_SAME_SITE=lax` e `SESSION_COOKIE_SECURE=true` no Render.
 - [ ] Só dados fictícios no banco.
 - [ ] Plano gratuito do Supabase **não tem backup automático**: migrations e dados de exemplo ficam no repositório.
 
@@ -94,7 +109,8 @@ e o front passa a usar `API_URL = "/api"`. Nesse modo o CORS deixa de ser necess
 | Deploy falha com `Connection ... refused` / `UnknownHost` no Flyway | `DB_URL` errada ou usando conexão direta (IPv6). Use o **Session pooler** porta 5432. |
 | `FATAL: Tenant or user not found` | `DB_USER` sem o sufixo `.<project-ref>`. |
 | `prepared statement ... already exists` | Está na porta **6543** (Transaction pooler). Troque para 5432. |
-| Navegador: erro de CORS | `CORS_ALLOWED_ORIGINS` não bate exatamente com a origem (esquema, domínio, sem `/` final). |
-| Login 200 mas próximas chamadas 401 | Cookie bloqueado: falta `credentials: "include"` no front, ou `SameSite`/`Secure` incorretos, ou navegador bloqueando cookie de terceiros (ver proxy acima). |
+| Navegador: erro de CORS | Você está chamando o Render diretamente e `CORS_ALLOWED_ORIGINS` não bate exatamente com a origem (esquema, domínio, sem `/` final). Com o proxy `/api`, esse erro não deve aparecer. |
+| `/api/...` retorna 404 na Vercel | O `destination` do rewrite em `vercel.json` está com a URL errada do Render, ou o serviço ainda está dormindo/subindo. |
+| Login 200 mas próximas chamadas 401 | Cookie bloqueado: falta `credentials: "include"` no front, `SameSite`/`Secure` incorretos, ou você está no modo direto e o navegador bloqueia cookie de terceiros (use o proxy). |
 | Render reinicia em loop / `OutOfMemoryError` | Plano gratuito tem 512 MB; ajuste `JAVA_OPTS` (ex.: `-XX:MaxRAMPercentage=60`). |
 | Primeira requisição muito lenta | Serviço dormindo (plano gratuito). |

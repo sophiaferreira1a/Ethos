@@ -32,6 +32,7 @@ class FluxoProfessorCoordenacaoTest extends BaseIntegracaoTest {
               "tipo": "%s",
               "descricao": "Conversa excessiva durante a aula",
               "medidasTomadas": "Conversa com o aluno",
+              "medidasSugeridas": "Suspensão",
               "data": "%s"
             }
             """;
@@ -57,6 +58,7 @@ class FluxoProfessorCoordenacaoTest extends BaseIntegracaoTest {
                         .content(CORPO.formatted(alunoId, "INDISCIPLINA", ontem)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.statusLancamento").value("NAO_LANCADA"))
+                .andExpect(jsonPath("$.medidasSugeridas").value("Suspensão"))
                 .andExpect(jsonPath("$.professorNome").value("Maria Silva"))
                 .andReturn();
         String ocorrenciaId = JsonPath.read(criada.getResponse().getContentAsString(), "$.id");

@@ -33,6 +33,9 @@ public record OcorrenciaRequest(
         @NotBlank(message = "informe as medidas tomadas")
         String medidasTomadas,
 
+        @Size(max = 2000, message = "sugestoes devem ter no maximo 2000 caracteres")
+        String medidasSugeridas,
+
         @NotNull(message = "informe a data")
         LocalDate data) {
 

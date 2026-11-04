@@ -312,7 +312,8 @@ async function salvarEdicao(form) {
     tipo: form.tipo.value,
     data: form.data.value,
     descricao: form.descricao.value.trim(),
-    medidasTomadas: form.medidas.value.trim()
+    medidasTomadas: form.medidas.value.trim(),
+    medidasSugeridas: form.medidasSugeridas.value.trim()
   };
   $$(".erro", form).forEach(el => { el.textContent = ""; });
   const hoje = new Date().toLocaleDateString("sv-SE");
@@ -414,6 +415,7 @@ function renderDetalhes() {
     ["Data da ocorrência", fmtData(o.data)],
     ["Descrição", o.descricao],
     ["Medidas tomadas", o.medidasTomadas.split(/;\s*/).filter(Boolean).join("\n") || "—"],
+    ["Sugestões à coordenação", (o.medidasSugeridas || "").split(/;\s*/).filter(Boolean).join("\n") || "—"],
     ["Registrada em", fmtDataHora(o.criadoEm)]
   ];
 
@@ -485,6 +487,10 @@ function renderEdicao() {
       <label for="ed-medidas">Medidas tomadas</label>
       <textarea id="ed-medidas" name="medidas" rows="3" maxlength="500">${esc(o.medidasTomadas)}</textarea>
       <small class="erro" data-erro="medidasTomadas"></small>
+
+      <label for="ed-sugestoes">Sugestões à coordenação</label>
+      <textarea id="ed-sugestoes" name="medidasSugeridas" rows="3" maxlength="2000">${esc(o.medidasSugeridas || "")}</textarea>
+      <small class="erro" data-erro="medidasSugeridas"></small>
 
       <div id="msg-edicao" class="msg" role="alert" hidden></div>
       <div class="det-acoes">

@@ -1,6 +1,7 @@
 /* ===== Configuração ===== */
-const API_URL = "http://localhost:8080"; // produção: URL do backend no Render
-const USAR_MOCK_SE_FALHAR = true;        // backend fora do ar NA ABERTURA da página: usa dados de exemplo (desligar no deploy)
+const MODO_LOCAL = !location.hostname || ["localhost", "127.0.0.1"].includes(location.hostname);
+const API_URL = MODO_LOCAL ? "http://localhost:8080" : "/api"; // produção: proxy /api configurado na Vercel
+const USAR_MOCK_SE_FALHAR = MODO_LOCAL;  // mock só em desenvolvimento; no deploy, falha real aparece
 let modoPrevia = false;                  // decidido uma vez, no início; não muda no meio do uso
 
 // v = valor enviado à API (combine os nomes dos enums com o Mateus); l = texto exibido
@@ -14,7 +15,8 @@ const TIPOS = [
   {v:"PATRIMONIO", l:"Dano ao patrimônio da escola"},
   {v:"OUTRO", l:"Outro comportamento inadequado"}
 ];
-const MEDIDAS = ["Conversa com o aluno", "Advertência verbal", "Advertência escrita (responsáveis assinam ciência)", "Suspensão", "Encaminhado à coordenação", "Responsável contatado", "Troca de lugar", "Atividade de reflexão"];
+const MEDIDAS = ["Conversa com o aluno", "Advertência verbal", "Encaminhado à coordenação", "Troca de lugar", "Atividade de reflexão"];
+const SUGESTOES = ["Advertência escrita (responsáveis assinam ciência)", "Suspensão", "Chamar os pais ou responsáveis", "Reunião com os responsáveis"];
 const TURMAS_MOCK = ["6A", "6B", "7A", "7B", "8A", "8B", "9A", "9B", "1EM", "2EM", "3EM"];
 // Alunos FICTÍCIOS, só para desenvolvimento (LGPD: não usar dados reais sem autorização da escola)
 const NOMES_MOCK = {
@@ -124,18 +126,19 @@ $("#btn-sair").onclick = async () => {
 };
 
 /* ===== Formulário em passos ===== */
-const TOTAL = 5;
+const TOTAL = 6;
 let passo = 1;
-const estado = {aluno: null, tipo: "", descricao: "", medidas: []};
+const estado = {aluno: null, tipo: "", descricao: "", medidas: [], medidasSugeridas: []};
 
 function montarOpcoes() {
   $("#tipos").innerHTML = TIPOS.map(t => `<label class="op"><input type="radio" name="tipo" value="${t.v}">${esc(t.l)}</label>`).join("");
   $("#medidas").innerHTML = MEDIDAS.map(m => `<label class="op"><input type="checkbox" name="medida" value="${esc(m)}">${esc(m)}</label>`).join("");
+  $("#sugestoes").innerHTML = SUGESTOES.map(s => `<label class="op"><input type="checkbox" name="sugestao" value="${esc(s)}">${esc(s)}</label>`).join("");
   preencherTurmas();
 }
 
 function novaOcorrencia() {
-  Object.assign(estado, {aluno: null, tipo: "", descricao: "", medidas: []});
+  Object.assign(estado, {aluno: null, tipo: "", descricao: "", medidas: [], medidasSugeridas: []});
   $("#form-oc").reset(); montarOpcoes();
   const hoje = new Date().toLocaleDateString("sv-SE");
   $("#data").value = hoje; $("#data").max = hoje;
@@ -152,9 +155,10 @@ function irPara(n) {
   $("#btn-prox").textContent = n === TOTAL ? "Enviar ocorrência" : "Continuar";
   $("#btn-voltar").textContent = n === 1 ? "Cancelar" : "Voltar";
   mostrarMsg($("#msg-oc"), "");
-  if (n === 5) montarResumo();
+  if (n === 6) montarResumo();
   if (n === 1) $("#busca").focus({preventScroll: true});
   if (n === 3) $("#descricao").focus({preventScroll: true});
+  if (n === 5) $("#sugestoes input").focus({preventScroll: true});
 }
 
 /* Passo 1: busca de aluno */
@@ -204,7 +208,7 @@ $("#descricao").addEventListener("input", e => $("#cont").textContent = e.target
 
 /* Validação por passo */
 function validar(n) {
-  erroCampo("aluno", ""); erroCampo("tipo", ""); erroCampo("data", ""); erroCampo("descricao", ""); erroCampo("medidas", "");
+  erroCampo("aluno", ""); erroCampo("tipo", ""); erroCampo("data", ""); erroCampo("descricao", ""); erroCampo("medidas", ""); erroCampo("sugestoes", "");
   $("#descricao").classList.remove("invalido");
   if (n === 1 && !estado.aluno) { erroCampo("aluno", "Selecione um aluno da lista."); return false; }
   if (n === 2) {
@@ -225,11 +229,16 @@ function validar(n) {
     if (outra) estado.medidas.push(outra);
     if (!estado.medidas.length) { erroCampo("medidas", "Selecione ou informe ao menos uma medida tomada."); return false; }
   }
+  if (n === 5) {
+    estado.medidasSugeridas = $$("input[name=sugestao]:checked").map(i => i.value);
+    const outra = $("#sugestao-outra").value.trim();
+    if (outra) estado.medidasSugeridas.push(outra);
+  }
   return true;
 }
 
 function montarResumo() {
-  const l = [["Aluno", `${estado.aluno.nome} (${estado.aluno.turma})`], ["Motivo", estado.tipoLabel], ["Data", estado.data.split("-").reverse().join("/")], ["Descrição", estado.descricao], ["Medidas tomadas", estado.medidas.join("\n")]];
+  const l = [["Aluno", `${estado.aluno.nome} (${estado.aluno.turma})`], ["Motivo", estado.tipoLabel], ["Data", estado.data.split("-").reverse().join("/")], ["Descrição", estado.descricao], ["Medidas tomadas", estado.medidas.join("\n")], ["Sugestões à coordenação", estado.medidasSugeridas.join("\n") || "Nenhuma"]];
   $("#resumo").innerHTML = l.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("");
 }
 
@@ -246,7 +255,8 @@ async function enviar(btn) {
   const corpo = {
     // Professor e statusLancamento (NAO_LANCADA) devem ser definidos pelo backend, a partir da sessão autenticada
     aluno: {id: estado.aluno.id, nome: estado.aluno.nome}, turma: estado.aluno.turma, tipo: estado.tipo,
-    descricao: estado.descricao, medidasTomadas: estado.medidas.join("; "), data: estado.data
+    descricao: estado.descricao, medidasTomadas: estado.medidas.join("; "),
+    medidasSugeridas: estado.medidasSugeridas.join("; "), data: estado.data
   };
   btn.disabled = true; btn.textContent = "Enviando…";
   try {

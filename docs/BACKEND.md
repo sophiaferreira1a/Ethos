@@ -41,7 +41,7 @@ const resposta = await fetch("http://localhost:8080/login", {
 - `POST /logout` encerra a sessão (204).
 - `redirectTo` já vem com o destino conforme o perfil (`/professor` ou `/coordenacao`); ajuste em `application.properties` quando as rotas do frontend existirem.
 
-Em produção (front na Vercel, API no Render) o cookie precisa de `SESSION_COOKIE_SAME_SITE=none` e `SESSION_COOKIE_SECURE=true`.
+Em produção (front na Vercel, API no Render) o padrão é a Vercel fazer proxy de `/api` para o Render; nesse caso use `SESSION_COOKIE_SAME_SITE=lax` e `SESSION_COOKIE_SECURE=true`. Se o front chamar o Render diretamente, use `SESSION_COOKIE_SAME_SITE=none`.
 
 ## Regras de acesso
 

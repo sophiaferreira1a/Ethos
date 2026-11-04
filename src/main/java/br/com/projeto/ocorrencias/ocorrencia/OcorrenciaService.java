@@ -71,7 +71,7 @@ public class OcorrenciaService {
 
         Usuario professor = usuarioLogado.usuario();
         Ocorrencia ocorrencia = new Ocorrencia(aluno, professor, conteudo.tipo(),
-                conteudo.descricao(), conteudo.medidas(), conteudo.data());
+                conteudo.descricao(), conteudo.medidas(), conteudo.medidasSugeridas(), conteudo.data());
         Ocorrencia salva = repositorio.saveAndFlush(ocorrencia);
         historico.registrar(salva.getId(), professor.getId(),
                 AcaoHistorico.OCORRENCIA_CRIADA.name(), "criada pelo professor");
@@ -105,7 +105,8 @@ public class OcorrenciaService {
         Aluno aluno = buscarAluno(dados.aluno().id());
         conferirTurma(dados.turma(), aluno);
         conferirData(conteudo.data());
-        ocorrencia.atualizar(aluno, conteudo.tipo(), conteudo.descricao(), conteudo.medidas(), conteudo.data());
+        ocorrencia.atualizar(aluno, conteudo.tipo(), conteudo.descricao(),
+                conteudo.medidas(), conteudo.medidasSugeridas(), conteudo.data());
         historico.registrar(ocorrencia.getId(), usuarioLogado.id(),
                 AcaoHistorico.OCORRENCIA_ATUALIZADA.name(), "atualizada");
         return OcorrenciaResponse.de(ocorrencia);
@@ -173,10 +174,17 @@ public class OcorrenciaService {
         if (dados.medidasTomadas() == null || dados.medidasTomadas().isBlank()) {
             throw new DadosOcorrenciaInvalidosException("Informe as medidas tomadas");
         }
+        String medidasSugeridas = dados.medidasSugeridas() == null
+                ? null
+                : dados.medidasSugeridas().trim();
+        if (medidasSugeridas != null && medidasSugeridas.isEmpty()) {
+            medidasSugeridas = null;
+        }
         if (dados.data() == null) {
             throw new DadosOcorrenciaInvalidosException("Informe a data da ocorrencia");
         }
-        return new Conteudo(dados.tipo(), descricao, dados.medidasTomadas().trim(), dados.data());
+        return new Conteudo(dados.tipo(), descricao, dados.medidasTomadas().trim(),
+                medidasSugeridas, dados.data());
     }
 
     private void conferirTurma(String turmaInformada, Aluno aluno) {
@@ -203,6 +211,7 @@ public class OcorrenciaService {
         }
     }
 
-    private record Conteudo(TipoOcorrencia tipo, String descricao, String medidas, LocalDate data) {
+    private record Conteudo(TipoOcorrencia tipo, String descricao, String medidas,
+                            String medidasSugeridas, LocalDate data) {
     }
 }

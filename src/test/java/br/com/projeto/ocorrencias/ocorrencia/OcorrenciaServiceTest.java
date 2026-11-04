@@ -93,7 +93,7 @@ class OcorrenciaServiceTest {
         });
 
         OcorrenciaResponse resposta = servico.criar(pedido("  6a ", "  Aluno interrompeu a aula.  ",
-                "  Conversa com o aluno  ", LocalDate.of(2026, 10, 30)));
+                "  Conversa com o aluno  ", "  Suspensão  ", LocalDate.of(2026, 10, 30)));
 
         ArgumentCaptor<Ocorrencia> captor = ArgumentCaptor.forClass(Ocorrencia.class);
         verify(repositorio).saveAndFlush(captor.capture());
@@ -105,12 +105,31 @@ class OcorrenciaServiceTest {
         assertThat(salva.getTurma()).isSameAs(turma);
         assertThat(salva.getDescricao()).isEqualTo("Aluno interrompeu a aula.");
         assertThat(salva.getMedidasTomadas()).isEqualTo("Conversa com o aluno");
+        assertThat(salva.getMedidasSugeridas()).isEqualTo("Suspensão");
         verify(historico).registrar(idGerado, professor.getId(),
                 AcaoHistorico.OCORRENCIA_CRIADA.name(), "criada pelo professor");
         assertThat(resposta.id()).isEqualTo(idGerado);
         assertThat(resposta.statusLancamento()).isEqualTo(StatusLancamento.NAO_LANCADA);
+        assertThat(resposta.medidasSugeridas()).isEqualTo("Suspensão");
         assertThat(resposta.dataLancamento()).isNull();
         assertThat(resposta.responsavelLancamentoId()).isNull();
+    }
+
+    @Test
+    void criarComSugestaoEmBrancoGravaNull() {
+        when(alunos.findComTurmaById(aluno.getId())).thenReturn(Optional.of(aluno));
+        when(repositorio.saveAndFlush(any(Ocorrencia.class))).thenAnswer(chamada -> {
+            Ocorrencia ocorrencia = chamada.getArgument(0);
+            ReflectionTestUtils.setField(ocorrencia, "id", idGerado);
+            return ocorrencia;
+        });
+
+        servico.criar(pedido("6A", "Aluno interrompeu a aula varias vezes.",
+                "Conversa com o aluno", "   ", LocalDate.of(2026, 10, 30)));
+
+        ArgumentCaptor<Ocorrencia> captor = ArgumentCaptor.forClass(Ocorrencia.class);
+        verify(repositorio).saveAndFlush(captor.capture());
+        assertThat(captor.getValue().getMedidasSugeridas()).isNull();
     }
 
     @Test
@@ -346,22 +365,29 @@ class OcorrenciaServiceTest {
 
     private OcorrenciaRequest pedidoValido() {
         return pedido("6A", "Aluno interrompeu a aula varias vezes.", "Conversa com o aluno",
-                LocalDate.of(2026, 10, 30));
+                "Suspensão", LocalDate.of(2026, 10, 30));
     }
 
     private OcorrenciaRequest pedido(String turmaNome, String descricao, String medidas, LocalDate data) {
+        return pedido(turmaNome, descricao, medidas, null, data);
+    }
+
+    private OcorrenciaRequest pedido(String turmaNome, String descricao, String medidas,
+                                     String medidasSugeridas, LocalDate data) {
         return new OcorrenciaRequest(
                 new OcorrenciaRequest.AlunoReferencia(aluno.getId(), aluno.getNome()),
                 turmaNome,
                 TipoOcorrencia.INDISCIPLINA,
                 descricao,
                 medidas,
+                medidasSugeridas,
                 data);
     }
 
     private Ocorrencia ocorrenciaPersistida() {
         Ocorrencia ocorrencia = new Ocorrencia(aluno, professor, TipoOcorrencia.INDISCIPLINA,
-                "Aluno interrompeu a aula varias vezes.", "Conversa com o aluno", LocalDate.of(2026, 10, 30));
+                "Aluno interrompeu a aula varias vezes.", "Conversa com o aluno",
+                "Suspensão", LocalDate.of(2026, 10, 30));
         ReflectionTestUtils.setField(ocorrencia, "id", idGerado);
         return ocorrencia;
     }

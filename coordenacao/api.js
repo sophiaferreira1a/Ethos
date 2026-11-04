@@ -1,9 +1,12 @@
+const MODO_LOCAL = !location.hostname || ["localhost", "127.0.0.1"].includes(location.hostname);
+
 const CONFIG = {
   // Em dev, abra o front em "localhost" (não 127.0.0.1), senão o cookie de sessão não é enviado.
-  API_URL: "http://localhost:8080",
+  // Em produção, a Vercel faz proxy de /api para o Render (ver vercel.json).
+  API_URL: MODO_LOCAL ? "http://localhost:8080" : "/api",
 
-  // Sem backend na abertura da página, usa dados fictícios em memória. Desligar (false) no deploy.
-  USAR_MOCK_SE_FALHAR: true,
+  // Sem backend na abertura da página, usa dados fictícios em memória. Só em desenvolvimento.
+  USAR_MOCK_SE_FALHAR: MODO_LOCAL,
 
   TAMANHO_PAGINA: 20,
 
@@ -96,6 +99,7 @@ function normalizarOcorrencia(o) {
     tipo: o.tipo || "",
     descricao: o.descricao || "",
     medidasTomadas: o.medidasTomadas || "",
+    medidasSugeridas: o.medidasSugeridas || "",
     data: o.data || "",
     status: o.statusLancamento || o.status || "NAO_LANCADA",
     dataLancamento: o.dataLancamento || null,
@@ -152,6 +156,7 @@ function corpoAtualizacao(o, mudancas) {
     tipo: mudancas.tipo,
     descricao: mudancas.descricao,
     medidasTomadas: mudancas.medidasTomadas,
+    medidasSugeridas: mudancas.medidasSugeridas || "",
     data: mudancas.data
   };
 }
@@ -285,7 +290,8 @@ const Local = (() => {
     PATRIMONIO: "Riscou a carteira com caneta durante a aula.",
     OUTRO: "Comportamento inadequado durante a apresentação de trabalhos."
   };
-  const MEDIDAS = ["Conversa com o aluno", "Advertência verbal", "Encaminhado à coordenação", "Responsável contatado", "Troca de lugar"];
+  const MEDIDAS = ["Conversa com o aluno", "Advertência verbal", "Encaminhado à coordenação", "Troca de lugar", "Atividade de reflexão"];
+  const SUGESTOES = ["Advertência escrita (responsáveis assinam ciência)", "Suspensão", "Chamar os pais ou responsáveis", "Reunião com os responsáveis"];
 
   const hoje = new Date();
   const diaISO = d => d.toLocaleDateString("sv-SE");
@@ -302,6 +308,7 @@ const Local = (() => {
     const o = {
       id, aluno: {id: `aluno-${turma}-${i % 2}`, nome: ALUNOS[turma][i % 2]}, turma, professor, tipo,
       descricao: DESCRICOES[tipo], medidasTomadas: [um(MEDIDAS), um(MEDIDAS)].filter((m, k, a) => a.indexOf(m) === k).join("; "),
+      medidasSugeridas: [um(SUGESTOES), um(SUGESTOES)].filter((m, k, a) => a.indexOf(m) === k).join("; "),
       data: diaISO(dia), status: "NAO_LANCADA", dataLancamento: null, responsavelLancamento: "", criadoEm: dia.toISOString()
     };
     historicos[id] = [{acao: "OCORRENCIA_CRIADA", usuario: professor, dataHora: dia.toISOString(), detalhes: ""}];
@@ -348,7 +355,8 @@ const Local = (() => {
       exigirSessao();
       const o = achar(id);
       if (o.status === "LANCADA" && !CONFIG.PODE_ALTERAR_LANCADA) throw new ApiErro(409, "Ocorrência já lançada não pode ser alterada.");
-      Object.assign(o, {tipo: corpo.tipo, descricao: corpo.descricao, medidasTomadas: corpo.medidasTomadas, data: corpo.data});
+      Object.assign(o, {tipo: corpo.tipo, descricao: corpo.descricao, medidasTomadas: corpo.medidasTomadas,
+        medidasSugeridas: corpo.medidasSugeridas, data: corpo.data});
       registrar(id, "OCORRENCIA_ATUALIZADA");
       return espera(o);
     },
