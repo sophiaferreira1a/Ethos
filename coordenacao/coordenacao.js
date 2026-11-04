@@ -130,7 +130,7 @@ const exportData = d => d ? String(d).slice(0, 10).split("-").reverse().join("/"
 const exportDataHora = d => {
   if (!d) return "";
   const x = new Date(d);
-  return isNaN(x) ? String(d) : x.toLocaleString("pt-BR");
+  return isNaN(x) ? String(d) : x.toLocaleString("pt-BR", {timeZone: "America/Sao_Paulo"});
 };
 // Aspas duplicadas e proteção contra fórmulas (=, +, -, @) ao abrir no Excel
 const celulaCsv = v => {
@@ -156,9 +156,10 @@ $("#btn-exportar").addEventListener("click", async e => {
     if (!todos.length) { mostrarMsg($("#msg-lista"), "Não há ocorrências para exportar com os filtros atuais."); return; }
 
     const cabecalho = ["Data", "Aluno", "Turma", "Tipo", "Professor", "Descrição", "Medidas tomadas",
-      "Situação", "Data do lançamento", "Responsável pelo lançamento", "Registrada em"];
+      "Sugestões à coordenação", "Situação", "Data do lançamento", "Responsável pelo lançamento", "Registrada em"];
     const linhas = todos.map(o => [
       exportData(o.data), o.aluno.nome, o.turma, rotuloTipo(o.tipo), o.professor, o.descricao, o.medidasTomadas,
+      o.medidasSugeridas,
       o.status === "LANCADA" ? "Lançada" : "Não lançada",
       exportDataHora(o.dataLancamento), o.responsavelLancamento, exportDataHora(o.criadoEm)
     ]);
