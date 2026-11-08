@@ -93,8 +93,10 @@ async function carregarTurmas() {
 }
 function preencherTurmas() {
   const sel = $("#turma"), atual = sel.value;
-  sel.innerHTML = `<option value="">Todas as turmas</option>` + turmas.map(t => `<option>${esc(t)}</option>`).join("");
-  sel.value = atual;
+  sel.innerHTML = `<option value="">Selecione a turma</option>` + turmas.map(t => `<option>${esc(t)}</option>`).join("");
+  sel.value = turmas.includes(atual) ? atual : "";
+  estado.turma = sel.value;
+  $("#busca").disabled = !sel.value;
 }
 function secao(id) { ["painel", "wizard", "sucesso"].forEach(s => $("#" + s).hidden = s !== id); window.scrollTo(0, 0); }
 
@@ -128,7 +130,8 @@ $("#btn-sair").onclick = async () => {
 /* ===== Formulário em passos ===== */
 const TOTAL = 6;
 let passo = 1;
-const estado = {aluno: null, tipo: "", descricao: "", medidas: [], medidasSugeridas: []};
+let pedidoBusca = 0; // descarta respostas de buscas antigas que cheguem atrasadas
+const estado = {alunos: [], turma: "", tipo: "", descricao: "", medidas: [], medidasSugeridas: []};
 
 function montarOpcoes() {
   $("#tipos").innerHTML = TIPOS.map(t => `<label class="op"><input type="radio" name="tipo" value="${t.v}">${esc(t.l)}</label>`).join("");
@@ -138,11 +141,14 @@ function montarOpcoes() {
 }
 
 function novaOcorrencia() {
-  Object.assign(estado, {aluno: null, tipo: "", descricao: "", medidas: [], medidasSugeridas: []});
+  Object.assign(estado, {alunos: [], turma: "", tipo: "", descricao: "", medidas: [], medidasSugeridas: []});
   $("#form-oc").reset(); montarOpcoes();
   const hoje = new Date().toLocaleDateString("sv-SE");
   $("#data").value = hoje; $("#data").max = hoje;
-  $("#lista-alunos").innerHTML = ""; $("#aluno-sel").hidden = true; $("#cont").textContent = 0;
+  pedidoBusca++;
+  $("#lista-alunos").innerHTML = ""; $("#lista-alunos")._dados = []; $("#alunos-sel").hidden = true; $("#cont").textContent = 0;
+  $("#busca").value = ""; $("#busca").disabled = true;
+  $("#busca").placeholder = "Escolha a turma primeiro";
   mostrarMsg($("#msg-oc"), ""); $$(".erro", $("#form-oc")).forEach(e => e.textContent = "");
   secao("wizard"); irPara(1);
 }
@@ -156,61 +162,116 @@ function irPara(n) {
   $("#btn-voltar").textContent = n === 1 ? "Cancelar" : "Voltar";
   mostrarMsg($("#msg-oc"), "");
   if (n === 6) montarResumo();
-  if (n === 1) $("#busca").focus({preventScroll: true});
+  if (n === 1) ($("#turma").value ? $("#busca") : $("#turma")).focus({preventScroll: true});
   if (n === 3) $("#descricao").focus({preventScroll: true});
   if (n === 5) $("#sugestoes input").focus({preventScroll: true});
 }
 
-/* Passo 1: busca de aluno */
+/* Passo 1: seleção de alunos por turma */
 let timer;
 $("#busca").addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(buscarAlunos, 250); });
-$("#turma").addEventListener("change", buscarAlunos);
+$("#turma").addEventListener("change", e => {
+  estado.turma = e.target.value;
+  estado.alunos = [];
+  $("#busca").value = "";
+  $("#busca").disabled = !estado.turma;
+  $("#busca").placeholder = estado.turma ? "Digite o nome do aluno" : "Escolha a turma primeiro";
+  erroCampo("turma", ""); erroCampo("aluno", "");
+  renderSelecionados();
+  if (estado.turma) buscarAlunos();
+  else {
+    pedidoBusca++;
+    $("#lista-alunos").innerHTML = "";
+    $("#lista-alunos")._dados = [];
+  }
+});
 
-let pedidoBusca = 0; // descarta respostas de buscas antigas que cheguem atrasadas
 async function buscarAlunos() {
   const q = $("#busca").value.trim(), turma = $("#turma").value, ul = $("#lista-alunos");
   const pedido = ++pedidoBusca;
-  if (!q && !turma) { ul.innerHTML = ""; return; }
+  if (!turma) { ul.innerHTML = ""; ul._dados = []; return; }
   let alunos;
   if (modoPrevia) {
     const n = s => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    alunos = ALUNOS_MOCK.filter(a => (!turma || a.turma === turma) && (!q || n(a.nome).includes(n(q))));
+    alunos = ALUNOS_MOCK.filter(a => a.turma === turma && (!q || n(a.nome).includes(n(q))));
   } else {
     try {
       alunos = await api("/alunos?" + new URLSearchParams({busca: q, turma}));
     } catch (err) {
       if (pedido !== pedidoBusca) return;
       if (err.status === 401) return sessaoExpirada();
+      ul._dados = [];
       ul.innerHTML = `<li class="vazio">Não foi possível buscar alunos.</li>`; return;
     }
   }
   if (pedido !== pedidoBusca) return;
-  ul.innerHTML = alunos.length
-    ? alunos.map(a => `<li class="item" role="option" tabindex="0" data-id="${a.id}"><span>${esc(a.nome)}</span><small>${esc(a.turma)}</small></li>`).join("")
-    : `<li class="vazio">Nenhum aluno encontrado.</li>`;
+  renderResultados(alunos);
+}
+
+function renderResultados(alunos) {
+  const ul = $("#lista-alunos");
   ul._dados = alunos;
+  ul.innerHTML = alunos.length
+    ? alunos.map(a => {
+        const marcado = estado.alunos.some(x => String(x.id) === String(a.id));
+        return `<li class="item${marcado ? " selecionado" : ""}" role="option" tabindex="0"
+          aria-selected="${marcado}" data-id="${esc(a.id)}">
+          <span class="item-info"><span>${esc(a.nome)}</span><small>${esc(a.turma)}</small></span>
+          <span class="check" aria-hidden="true">✓</span>
+        </li>`;
+      }).join("")
+    : `<li class="vazio">Nenhum aluno encontrado.</li>`;
 }
 
 function selecionarAluno(li) {
-  const a = $("#lista-alunos")._dados.find(x => String(x.id) === li.dataset.id);
+  const a = ($("#lista-alunos")._dados || []).find(x => String(x.id) === li.dataset.id);
   if (!a) return;
-  estado.aluno = a; erroCampo("aluno", "");
-  $("#lista-alunos").innerHTML = ""; $("#busca").value = "";
-  const chip = $("#aluno-sel");
-  chip.innerHTML = `<span>${esc(a.nome)} · ${esc(a.turma)}</span><button type="button">Trocar</button>`;
-  chip.hidden = false;
+  const indice = estado.alunos.findIndex(x => String(x.id) === String(a.id));
+  if (indice >= 0) estado.alunos.splice(indice, 1);
+  else estado.alunos.push(a);
+  erroCampo("aluno", "");
+  renderResultados($("#lista-alunos")._dados || []);
+  renderSelecionados();
 }
+
+function renderSelecionados() {
+  const total = estado.alunos.length;
+  $("#alunos-sel").hidden = !total;
+  $("#sel-cont").textContent = total === 1 ? "1 aluno selecionado" : `${total} alunos selecionados`;
+  $("#lista-sel").innerHTML = estado.alunos.map(a =>
+    `<li class="chip-aluno">
+      <span>${esc(a.nome)}</span>
+      <button type="button" data-id="${esc(a.id)}" aria-label="Remover ${esc(a.nome)}">✕</button>
+    </li>`).join("");
+}
+
 $("#lista-alunos").addEventListener("click", e => { const li = e.target.closest(".item"); if (li) selecionarAluno(li); });
-$("#lista-alunos").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.classList.contains("item")) selecionarAluno(e.target); });
-$("#aluno-sel").addEventListener("click", e => { if (e.target.tagName === "BUTTON") { estado.aluno = null; $("#aluno-sel").hidden = true; $("#busca").focus(); } });
+$("#lista-alunos").addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.classList.contains("item")) { e.preventDefault(); selecionarAluno(e.target); }
+});
+$("#lista-sel").addEventListener("click", e => {
+  const btn = e.target.closest("button[data-id]");
+  if (!btn) return;
+  estado.alunos = estado.alunos.filter(a => String(a.id) !== btn.dataset.id);
+  renderSelecionados();
+  renderResultados($("#lista-alunos")._dados || []);
+});
+$("#limpar-sel").addEventListener("click", () => {
+  estado.alunos = [];
+  renderSelecionados();
+  renderResultados($("#lista-alunos")._dados || []);
+});
 
 $("#descricao").addEventListener("input", e => $("#cont").textContent = e.target.value.length);
 
 /* Validação por passo */
 function validar(n) {
-  erroCampo("aluno", ""); erroCampo("tipo", ""); erroCampo("data", ""); erroCampo("descricao", ""); erroCampo("medidas", ""); erroCampo("sugestoes", "");
+  erroCampo("aluno", ""); erroCampo("turma", ""); erroCampo("tipo", ""); erroCampo("data", ""); erroCampo("descricao", ""); erroCampo("medidas", ""); erroCampo("sugestoes", "");
   $("#descricao").classList.remove("invalido");
-  if (n === 1 && !estado.aluno) { erroCampo("aluno", "Selecione um aluno da lista."); return false; }
+  if (n === 1) {
+    if (!$("#turma").value) { erroCampo("turma", "Escolha a turma."); return false; }
+    if (!estado.alunos.length) { erroCampo("aluno", "Selecione ao menos um aluno da lista."); return false; }
+  }
   if (n === 2) {
     const marcado = $("input[name=tipo]:checked");
     estado.tipo = marcado?.value || "";
@@ -238,7 +299,7 @@ function validar(n) {
 }
 
 function montarResumo() {
-  const l = [["Aluno", `${estado.aluno.nome} (${estado.aluno.turma})`], ["Motivo", estado.tipoLabel], ["Data", estado.data.split("-").reverse().join("/")], ["Descrição", estado.descricao], ["Medidas tomadas", estado.medidas.join("\n")], ["Sugestões à coordenação", estado.medidasSugeridas.join("\n") || "Nenhuma"]];
+  const l = [["Turma", estado.turma], ["Alunos", estado.alunos.map(a => a.nome).join("\n")], ["Motivo", estado.tipoLabel], ["Data", estado.data.split("-").reverse().join("/")], ["Descrição", estado.descricao], ["Medidas tomadas", estado.medidas.join("\n")], ["Sugestões à coordenação", estado.medidasSugeridas.join("\n") || "Nenhuma"]];
   $("#resumo").innerHTML = l.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("");
 }
 
@@ -250,18 +311,17 @@ $("#form-oc").addEventListener("submit", async e => {
 });
 $("#btn-voltar").onclick = () => passo === 1 ? secao("painel") : irPara(passo - 1);
 
-/* Envio: POST /ocorrencias */
+/* Envio: POST /ocorrencias/lote (uma ocorrência por aluno, na mesma transação) */
 async function enviar(btn) {
   const corpo = {
-    // Professor e statusLancamento (NAO_LANCADA) devem ser definidos pelo backend, a partir da sessão autenticada
-    aluno: {id: estado.aluno.id, nome: estado.aluno.nome}, turma: estado.aluno.turma, tipo: estado.tipo,
+    alunoIds: estado.alunos.map(a => a.id), turma: estado.turma, tipo: estado.tipo,
     descricao: estado.descricao, medidasTomadas: estado.medidas.join("; "),
     medidasSugeridas: estado.medidasSugeridas.join("; "), data: estado.data
   };
   btn.disabled = true; btn.textContent = "Enviando…";
   try {
     if (modoPrevia) console.info("Prévia — payload:", corpo);
-    else await api("/ocorrencias", {method: "POST", body: JSON.stringify(corpo)});
+    else await api("/ocorrencias/lote", {method: "POST", body: JSON.stringify(corpo)});
     sucesso();
   } catch (err) {
     if (err.status === 401) return sessaoExpirada();
@@ -269,7 +329,11 @@ async function enviar(btn) {
   } finally { btn.disabled = false; btn.textContent = passo === TOTAL ? "Enviar ocorrência" : "Continuar"; }
 }
 function sucesso() {
-  $("#sucesso-txt").textContent = `${estado.aluno.nome} (${estado.aluno.turma}) · ${estado.tipoLabel}`;
+  const total = estado.alunos.length;
+  const lista = estado.alunos.map(a => a.nome).join(", ");
+  $("#sucesso-txt").textContent = total === 1
+    ? `${lista} (${estado.turma}) · ${estado.tipoLabel}`
+    : `${total} ocorrências registradas para a turma ${estado.turma} · ${estado.tipoLabel}`;
   secao("sucesso");
 }
 

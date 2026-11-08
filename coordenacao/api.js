@@ -110,6 +110,20 @@ function normalizarOcorrencia(o) {
 
 const semAcento = t => String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 
+function normalizarTurma(t) {
+  return {id: String(t.id), nome: nomeDe(t)};
+}
+
+function normalizarAluno(a) {
+  return {
+    id: String(a.id),
+    nome: a.nome || "—",
+    turmaId: a.turmaId ? String(a.turmaId) : null,
+    turma: nomeDe(a.turma) || a.turmaNome || "—"
+  };
+}
+
+
 function filtrarNoNavegador(itens, filtros, ordem) {
   const turma = filtros.turma ? semAcento(filtros.turma) : "";
   const aluno = filtros.aluno ? semAcento(filtros.aluno) : "";
@@ -249,14 +263,65 @@ const Api = {
   },
 
   async turmas() {
-    if (this.local) return TURMAS_PADRAO;
+    if (this.local) return Local.turmas();
     try {
-      const d = await requisitar("GET", "/turmas");
-      const nomes = (d || []).map(nomeDe).filter(Boolean);
+      const lista = await this.listarTurmas();
+      const nomes = lista.map(t => t.nome).filter(Boolean);
       return nomes.length ? nomes : TURMAS_PADRAO;
     } catch {
       return TURMAS_PADRAO;
     }
+  },
+
+  async listarTurmas() {
+    if (this.local) return Local.listarTurmas();
+    const d = await requisitar("GET", "/turmas");
+    return (d || []).map(normalizarTurma);
+  },
+
+  async criarTurma(nome) {
+    if (this.local) return Local.criarTurma(nome);
+    return normalizarTurma(await requisitar("POST", "/turmas", {nome}));
+  },
+
+  async atualizarTurma(id, nome) {
+    if (this.local) return Local.atualizarTurma(id, nome);
+    return normalizarTurma(await requisitar("PUT", `/turmas/${encodeURIComponent(id)}`, {nome}));
+  },
+
+  async excluirTurma(id) {
+    if (this.local) return Local.excluirTurma(id);
+    await requisitar("DELETE", `/turmas/${encodeURIComponent(id)}`);
+  },
+
+  async listarAlunos(filtros = {}) {
+    if (this.local) return Local.listarAlunos(filtros);
+    const p = new URLSearchParams();
+    if (filtros.busca) p.set("busca", filtros.busca);
+    if (filtros.turma) p.set("turma", filtros.turma);
+    const d = await requisitar("GET", "/alunos" + (p.toString() ? "?" + p : ""));
+    return (d || []).map(normalizarAluno);
+  },
+
+  async criarAluno(nome, turmaId) {
+    if (this.local) return Local.criarAluno(nome, turmaId);
+    return normalizarAluno(await requisitar("POST", "/alunos", {nome, turmaId}));
+  },
+
+  async atualizarAluno(id, nome, turmaId) {
+    if (this.local) return Local.atualizarAluno(id, nome, turmaId);
+    return normalizarAluno(await requisitar("PUT", `/alunos/${encodeURIComponent(id)}`, {nome, turmaId}));
+  },
+
+  async excluirAluno(id) {
+    if (this.local) return Local.excluirAluno(id);
+    await requisitar("DELETE", `/alunos/${encodeURIComponent(id)}`);
+  },
+
+  async moverAlunos(alunoIds, turmaId) {
+    if (this.local) return Local.moverAlunos(alunoIds, turmaId);
+    const d = await requisitar("PATCH", "/alunos/turma", {alunoIds, turmaId});
+    return (d || []).map(normalizarAluno);
   }
 };
 
@@ -279,6 +344,10 @@ const Local = (() => {
     "9A": ["Gabriela Torres", "Henrique Dias"], "9B": ["Karen Batista", "Otávio Lacerda"],
     "1EM": ["Paula Vieira", "Renato Cunha"], "2EM": ["Vinícius Falcão", "Yasmin Teles"], "3EM": ["Beatriz Lopes", "Caio Veloso"]
   };
+  const turmas = Object.keys(ALUNOS).map(nome => ({id: `turma-${nome}`, nome}));
+  const alunos = Object.entries(ALUNOS).flatMap(([turma, nomes]) =>
+    nomes.map((nome, indice) => ({id: `aluno-${turma}-${indice}`, nome, turmaId: `turma-${turma}`})));
+  let seqTurma = 0, seqAluno = 0;
   const PROFESSORES = ["Maria Silva", "Joao Pereira"];
   const DESCRICOES = {
     DESRESPEITO: "Respondeu de forma grosseira após ser chamado atenção durante a explicação.",
@@ -330,6 +399,18 @@ const Local = (() => {
   const registrar = (id, acao, detalhes = "") =>
     historicos[id].push({acao, usuario: usuario?.nome || "—", dataHora: new Date().toISOString(), detalhes});
   const exigirSessao = () => { if (!usuario) throw new ApiErro(401, mensagemPadrao(401)); };
+  const acharTurma = id => {
+    const t = turmas.find(x => x.id === id);
+    if (!t) throw new ApiErro(404, "Turma não encontrada.");
+    return t;
+  };
+  const acharAluno = id => {
+    const a = alunos.find(x => x.id === id);
+    if (!a) throw new ApiErro(404, "Aluno não encontrado ou excluído.");
+    return a;
+  };
+  const nomeTurma = id => acharTurma(id).nome;
+  const alunoNormalizado = a => ({id: a.id, nome: a.nome, turmaId: a.turmaId, turma: nomeTurma(a.turmaId)});
 
   return {
     async me() { exigirSessao(); return espera(usuario, 60); },
@@ -340,6 +421,91 @@ const Local = (() => {
       return espera(usuario);
     },
     async logout() { usuario = null; guardar(null); },
+
+    async turmas() {
+      exigirSessao();
+      return espera(turmas.map(t => t.nome));
+    },
+    async listarTurmas() {
+      exigirSessao();
+      return espera(turmas.map(t => ({id: t.id, nome: t.nome})));
+    },
+    async criarTurma(nome) {
+      exigirSessao();
+      const limpo = String(nome || "").trim();
+      if (!limpo) throw new ApiErro(400, "Informe o nome da turma.");
+      if (turmas.some(t => semAcento(t.nome) === semAcento(limpo))) {
+        throw new ApiErro(409, "Já existe uma turma com esse nome.");
+      }
+      const nova = {id: `turma-local-${++seqTurma}`, nome: limpo};
+      turmas.push(nova);
+      return espera(nova);
+    },
+    async atualizarTurma(id, nome) {
+      exigirSessao();
+      const turma = acharTurma(id);
+      const limpo = String(nome || "").trim();
+      if (!limpo) throw new ApiErro(400, "Informe o nome da turma.");
+      if (turmas.some(t => t.id !== id && semAcento(t.nome) === semAcento(limpo))) {
+        throw new ApiErro(409, "Já existe uma turma com esse nome.");
+      }
+      const anterior = turma.nome;
+      turma.nome = limpo;
+      // No mock a ocorrência guarda o nome da turma, então o rename precisa refletir no histórico.
+      ocorrencias.forEach(o => { if (o.turma === anterior) o.turma = limpo; });
+      return espera(turma);
+    },
+    async excluirTurma(id) {
+      exigirSessao();
+      const turma = acharTurma(id);
+      if (alunos.some(a => a.turmaId === id) || ocorrencias.some(o => o.turma === turma.nome)) {
+        throw new ApiErro(409, "Turma possui alunos ou ocorrências vinculadas e não pode ser excluída.");
+      }
+      turmas.splice(turmas.indexOf(turma), 1);
+      await espera(null);
+    },
+    async listarAlunos(f = {}) {
+      exigirSessao();
+      const busca = semAcento(f.busca || "");
+      const lista = alunos
+        .filter(a => (!f.turma || nomeTurma(a.turmaId) === f.turma) &&
+          (!busca || semAcento(a.nome).includes(busca)))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+        .map(alunoNormalizado);
+      return espera(lista);
+    },
+    async criarAluno(nome, turmaId) {
+      exigirSessao();
+      const limpo = String(nome || "").trim();
+      if (!limpo) throw new ApiErro(400, "Informe o nome do aluno.");
+      acharTurma(turmaId);
+      const novo = {id: `aluno-local-${++seqAluno}`, nome: limpo, turmaId};
+      alunos.push(novo);
+      return espera(alunoNormalizado(novo));
+    },
+    async atualizarAluno(id, nome, turmaId) {
+      exigirSessao();
+      const aluno = acharAluno(id);
+      const limpo = String(nome || "").trim();
+      if (!limpo) throw new ApiErro(400, "Informe o nome do aluno.");
+      acharTurma(turmaId);
+      Object.assign(aluno, {nome: limpo, turmaId});
+      return espera(alunoNormalizado(aluno));
+    },
+    async excluirAluno(id) {
+      exigirSessao();
+      const aluno = acharAluno(id);
+      alunos.splice(alunos.indexOf(aluno), 1);
+      await espera(null);
+    },
+    async moverAlunos(alunoIds, turmaId) {
+      exigirSessao();
+      acharTurma(turmaId);
+      const selecionados = alunoIds.map(acharAluno);
+      selecionados.forEach(a => { a.turmaId = turmaId; });
+      return espera(selecionados.map(alunoNormalizado));
+    },
+
     async listar(f, pagina, ordem, tamanho) {
       exigirSessao();
       const r = filtrarNoNavegador(ocorrencias.filter(o =>

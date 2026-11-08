@@ -49,12 +49,15 @@ Em produção (front na Vercel, API no Render) o padrão é a Vercel fazer proxy
 | Método | Endpoint | Perfil |
 |---|---|---|
 | POST | /login | público |
-| POST | /ocorrencias | PROFESSOR |
+| POST | /ocorrencias, /ocorrencias/lote | PROFESSOR |
 | GET | /ocorrencias, /ocorrencias/{id} | COORDENACAO |
 | PUT/DELETE | /ocorrencias/{id} | PROFESSOR ou COORDENACAO (dono da ocorrência é checado no service) |
 | PATCH | /ocorrencias/{id}/lancada | COORDENACAO |
 | GET | /ocorrencias/{id}/historico | COORDENACAO |
 | GET | /indicadores | COORDENACAO |
+| GET | /alunos, /turmas | PROFESSOR ou COORDENACAO |
+| POST/PUT/DELETE | /alunos, /alunos/{id}, /turmas, /turmas/{id} | COORDENACAO |
+| PATCH | /alunos/turma | COORDENACAO |
 
 Tudo o que não está listado exige autenticação. Use `@PreAuthorize("hasRole('COORDENACAO')")` no service/controller quando precisar de regra extra.
 
@@ -90,13 +93,36 @@ public class OcorrenciaService {
 - `acao` precisa ser o `name()` de uma constante de `AcaoHistorico`; qualquer outro valor lança `IllegalArgumentException`.
 - `detalhes` é opcional (`null` ou em branco vira `null`).
 
+## Ocorrências em lote
+
+### `POST /ocorrencias/lote`
+
+Cria **uma ocorrência por aluno** selecionado, na mesma transação. Exclusivo do **PROFESSOR**. Todos os alunos precisam ser da mesma turma e a `turma` enviada (nome) precisa bater com a turma atual do aluno.
+
+```json
+{
+  "alunoIds": ["…", "…"],
+  "turma": "6A",
+  "tipo": "INDISCIPLINA",
+  "descricao": "Aluno interrompeu a aula várias vezes.",
+  "medidasTomadas": "Conversa com o aluno",
+  "medidasSugeridas": "Suspensão",
+  "data": "2026-10-30"
+}
+```
+
+- `201` com uma lista de `OcorrenciaResponse` (uma por aluno).
+- `400` para seleção vazia, alunos de turmas diferentes ou conteúdo inválido.
+- `404` se algum aluno não existe ou foi excluído.
+- Se qualquer etapa falhar (inclusive o histórico), nada é gravado.
+
 ## Alunos e turmas
 
 Consulta para os dois perfis (**PROFESSOR** e **COORDENACAO**). O cadastro vem do banco: a migration `V31__seed_alunos_turmas_dev.sql` cria 11 turmas e 44 alunos **fictícios** para desenvolvimento.
 
 ### `GET /alunos?busca=&turma=`
 
-Busca do passo 1 do registro de ocorrência. `busca` é parte do nome (sem diferenciar maiúsculas); `turma` é o nome da turma. Os dois são opcionais.
+Busca do passo 1 do registro de ocorrência. `busca` é parte do nome (sem diferenciar maiúsculas); `turma` é o nome da turma. Os dois são opcionais. Alunos com exclusão lógica não aparecem.
 
 ```json
 [ { "id": "…", "nome": "Ana Clara Souza", "turmaId": "…", "turma": "6A" } ]
@@ -107,6 +133,35 @@ Busca do passo 1 do registro de ocorrência. `busca` é parte do nome (sem difer
 ```json
 [ { "id": "…", "nome": "6A" }, { "id": "…", "nome": "6B" } ]
 ```
+
+### Cadastro de alunos (COORDENACAO)
+
+| Método | Endpoint | Resultado |
+|---|---|---|
+| POST | `/alunos` | Cria aluno; corpo `{ "nome": "…", "turmaId": "…" }`; `201` |
+| PUT | `/alunos/{id}` | Atualiza nome e/ou turma; `200` |
+| DELETE | `/alunos/{id}` | Exclusão **lógica** (`excluido_em`); `204` |
+| PATCH | `/alunos/turma` | Move vários alunos para uma turma; `200` com a lista movida |
+
+O `DELETE` preserva ocorrências e históricos. O aluno some de `GET /alunos` e não pode ser usado em novas ocorrências.
+
+```json
+{ "alunoIds": ["…", "…"], "turmaId": "…" }
+```
+
+A movimentação é atômica: se algum aluno não existir ou estiver excluído, ninguém é movido. Ocorrências antigas continuam apontando para a turma em que foram registradas.
+
+### Cadastro de turmas (COORDENACAO)
+
+| Método | Endpoint | Resultado |
+|---|---|---|
+| POST | `/turmas` | Cria turma; corpo `{ "nome": "6A" }`; `201` |
+| PUT | `/turmas/{id}` | Renomeia; `200` |
+| DELETE | `/turmas/{id}` | Exclui apenas se não houver vínculos; `204` |
+
+Nome duplicado (sem diferenciar maiúsculas) responde `409`. A exclusão também responde `409` quando a turma tem alunos (inclusive excluídos) ou ocorrências vinculadas.
+
+> Turmas são reutilizadas a cada ano; ainda não existe `ano_letivo`. A movimentação anual é feita por `PATCH /alunos/turma`.
 
 ## Histórico e indicadores (Bernardo)
 

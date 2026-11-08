@@ -31,13 +31,16 @@ function avisar(texto) {
   avisoTimer = setTimeout(() => { el.hidden = true; }, 3500);
 }
 
-function confirmar({titulo, texto, botao, perigo = false}) {
+function confirmar({titulo, texto, botao, perigo = false, cancelar = "Cancelar", cancelarPrimario = false}) {
   const dlg = $("#dlg-confirmar");
   $("#conf-titulo").textContent = titulo;
   $("#conf-texto").textContent = texto;
   const sim = $("#conf-sim");
   sim.textContent = botao;
   sim.classList.toggle("perigo", perigo);
+  const nao = $("#conf-nao");
+  nao.textContent = cancelar;
+  nao.className = "btn " + (cancelarPrimario ? "azul" : "secundario");
   dlg.returnValue = "";
   dlg.showModal();
   return new Promise(res => dlg.addEventListener("close", () => res(dlg.returnValue === "sim"), {once: true}));
@@ -52,7 +55,13 @@ const ui = {
   totalPaginas: 1,
   itens: [],
   atual: null,
-  pedidoLista: 0 // descarta respostas antigas quando o filtro muda rápido
+  pedidoLista: 0, // descarta respostas antigas quando o filtro muda rápido
+  aba: "ocorrencias",
+  subaba: "turmas",
+  turmas: [],
+  alunos: [],
+  moverSelecionados: new Set(),
+  turmasCarregadas: false
 };
 
 function tratarErroGlobal(e) {
@@ -82,6 +91,7 @@ async function telaApp() {
   await prepararFiltros();
   sincronizarControles();
   await recarregar();
+  irParaAba(ui.aba);
 }
 
 $("#form-login").addEventListener("submit", async e => {
@@ -182,9 +192,18 @@ let filtrosProntos = false;
 async function prepararFiltros() {
   if (filtrosProntos) return;
   $("#f-tipo").insertAdjacentHTML("beforeend", TIPOS.map(t => `<option value="${t.v}">${esc(t.l)}</option>`).join(""));
-  const turmas = await Api.turmas();
-  $("#f-turma").insertAdjacentHTML("beforeend", turmas.map(t => `<option>${esc(t)}</option>`).join(""));
+  await carregarTurmas();
   filtrosProntos = true;
+}
+
+async function carregarTurmas() {
+  try {
+    ui.turmas = await Api.listarTurmas();
+  } catch (e) {
+    if (tratarErroGlobal(e)) return;
+    ui.turmas = [];
+  }
+  preencherOpcoesTurmas();
 }
 
 function sincronizarControles() {
@@ -234,6 +253,332 @@ function limparFiltros() {
 }
 $("#btn-limpar").addEventListener("click", limparFiltros);
 $("#vazio-limpar").addEventListener("click", limparFiltros);
+
+/* ===== Abas e cadastros ===== */
+function irParaAba(nome) {
+  ui.aba = nome;
+  $$(".aba").forEach(b => {
+    const ativo = b.dataset.aba === nome;
+    b.setAttribute("aria-selected", String(ativo));
+    b.tabIndex = ativo ? 0 : -1;
+  });
+  $("#aba-ocorrencias").hidden = nome !== "ocorrencias";
+  $("#aba-cadastros").hidden = nome !== "cadastros";
+  if (nome === "cadastros") {
+    carregarCadastros().catch(e => {
+      if (!tratarErroGlobal(e)) avisar(e.message);
+    });
+  } else if (ui.turmasCarregadas) {
+    // Cadastros podem ter mudado nomes/turmas: atualiza a lista ao voltar.
+    recarregar().catch(e => {
+      if (!tratarErroGlobal(e)) avisar(e.message);
+    });
+  }
+}
+$$(".aba").forEach(b => b.addEventListener("click", () => irParaAba(b.dataset.aba)));
+
+function irParaSubaba(nome) {
+  ui.subaba = nome;
+  $$("[data-ir-subaba]").forEach(b => b.setAttribute("aria-selected", String(b.dataset.irSubaba === nome)));
+  $$("[data-painel-subaba]").forEach(p => { p.hidden = p.dataset.painelSubaba !== nome; });
+  if (nome === "montar") renderMover();
+}
+$$("[data-ir-subaba]").forEach(b => b.addEventListener("click", () => irParaSubaba(b.dataset.irSubaba)));
+
+function preencherOpcoesTurmas() {
+  if (ui.filtros.turma && !ui.turmas.some(t => t.nome === ui.filtros.turma)) ui.filtros.turma = "";
+  const opcoes = (sel, rotulo, usarId = false) => {
+    const atual = sel.value;
+    sel.innerHTML = `<option value="">${esc(rotulo)}</option>` + ui.turmas.map(t =>
+      `<option value="${esc(usarId ? t.id : t.nome)}">${esc(t.nome)}</option>`).join("");
+    sel.value = [...sel.options].some(o => o.value === atual) ? atual : "";
+  };
+  opcoes($("#f-turma"), "Todas");
+  opcoes($("#cad-filtro-turma"), "Todas as turmas", true);
+  opcoes($("#mover-origem"), "Todas as turmas", true);
+  opcoes($("#mover-destino"), "Selecione a turma", true);
+}
+
+async function carregarCadastros(forcar = false) {
+  if (ui.turmasCarregadas && !forcar) {
+    renderTurmas(); renderAlunosCadastro(); renderMover();
+    return;
+  }
+  try {
+    const [turmas, alunos] = await Promise.all([Api.listarTurmas(), Api.listarAlunos()]);
+    ui.turmas = turmas;
+    ui.alunos = alunos;
+    ui.moverSelecionados.clear();
+    ui.turmasCarregadas = true;
+    preencherOpcoesTurmas();
+    mostrarMsg($("#msg-turmas"), "");
+    mostrarMsg($("#msg-alunos"), "");
+    mostrarMsg($("#msg-mover"), "");
+    renderTurmas(); renderAlunosCadastro(); renderMover();
+  } catch (e) {
+    if (tratarErroGlobal(e)) return;
+    mostrarMsg($("#msg-turmas"), e.message);
+    mostrarMsg($("#msg-alunos"), e.message);
+  }
+}
+
+function renderTurmas() {
+  $("#linhas-turmas").innerHTML = ui.turmas.map(turma => {
+    const quantidade = ui.alunos.filter(a => a.turmaId === turma.id).length;
+    return `<tr data-id="${esc(turma.id)}">
+      <td data-rotulo="Turma"><div class="cel"><strong>${esc(turma.nome)}</strong></div></td>
+      <td data-rotulo="Alunos ativos"><div class="cel">${quantidade}</div></td>
+      <td class="col-acoes">
+        <button type="button" class="btn secundario pequeno" data-acao="editar-turma"
+          aria-label="Renomear turma ${esc(turma.nome)}">Renomear</button>
+        <button type="button" class="btn texto pequeno perigo-txt" data-acao="excluir-turma"
+          aria-label="Excluir turma ${esc(turma.nome)}">Excluir</button>
+      </td>
+    </tr>`;
+  }).join("");
+  $("#vazio-turmas").hidden = ui.turmas.length > 0;
+  $("#tabela-turmas").closest(".tabela-wrap").hidden = !ui.turmas.length;
+}
+
+function renderAlunosCadastro() {
+  const busca = semAcento($("#cad-busca-aluno").value.trim());
+  const turmaId = $("#cad-filtro-turma").value;
+  const alunos = ui.alunos
+    .filter(a => (!turmaId || a.turmaId === turmaId) && (!busca || semAcento(a.nome).includes(busca)))
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  $("#linhas-alunos").innerHTML = alunos.map(aluno => `<tr data-id="${esc(aluno.id)}">
+      <td data-rotulo="Aluno"><div class="cel">${esc(aluno.nome)}</div></td>
+      <td data-rotulo="Turma"><div class="cel">${esc(aluno.turma)}</div></td>
+      <td class="col-acoes">
+        <button type="button" class="btn secundario pequeno" data-acao="editar-aluno"
+          aria-label="Editar ${esc(aluno.nome)}">Editar</button>
+        <button type="button" class="btn texto pequeno perigo-txt" data-acao="excluir-aluno"
+          aria-label="Excluir ${esc(aluno.nome)}">Excluir</button>
+      </td>
+    </tr>`).join("");
+  $("#vazio-alunos").hidden = alunos.length > 0;
+  $("#tabela-alunos").closest(".tabela-wrap").hidden = !alunos.length;
+}
+
+function alunosParaMover() {
+  const origem = $("#mover-origem").value;
+  return ui.alunos
+    .filter(a => !origem || a.turmaId === origem)
+    .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+}
+
+function atualizarContagemMover() {
+  const total = ui.moverSelecionados.size;
+  $("#mover-cont").textContent = total === 0 ? "Nenhum aluno selecionado"
+    : total === 1 ? "1 aluno selecionado" : `${total} alunos selecionados`;
+  $("#btn-mover").disabled = total === 0 || !$("#mover-destino").value;
+}
+
+function renderMover() {
+  const alunos = alunosParaMover();
+  const selecionados = ui.moverSelecionados;
+  $("#linhas-mover").innerHTML = alunos.map(aluno => `<tr data-id="${esc(aluno.id)}">
+      <td class="col-check"><input type="checkbox" class="mover-check" data-aluno-id="${esc(aluno.id)}"
+        ${selecionados.has(aluno.id) ? "checked" : ""} aria-label="Selecionar ${esc(aluno.nome)}"></td>
+      <td data-rotulo="Aluno"><div class="cel">${esc(aluno.nome)}</div></td>
+      <td data-rotulo="Turma atual"><div class="cel">${esc(aluno.turma)}</div></td>
+    </tr>`).join("");
+  $("#vazio-mover").hidden = alunos.length > 0;
+  $("#tabela-mover").closest(".tabela-wrap").hidden = !alunos.length;
+  const ids = alunos.map(a => a.id);
+  const todos = ids.length > 0 && ids.every(id => selecionados.has(id));
+  $("#mover-todos").checked = todos;
+  $("#mover-todos").indeterminate = !todos && ids.some(id => selecionados.has(id));
+  atualizarContagemMover();
+}
+
+$("#cad-busca-aluno").addEventListener("input", renderAlunosCadastro);
+$("#cad-filtro-turma").addEventListener("change", renderAlunosCadastro);
+$("#mover-origem").addEventListener("change", () => {
+  ui.moverSelecionados.clear();
+  mostrarMsg($("#msg-mover"), "");
+  renderMover();
+});
+$("#mover-destino").addEventListener("change", atualizarContagemMover);
+$("#linhas-mover").addEventListener("change", e => {
+  const cb = e.target.closest(".mover-check");
+  if (!cb) return;
+  if (cb.checked) ui.moverSelecionados.add(cb.dataset.alunoId);
+  else ui.moverSelecionados.delete(cb.dataset.alunoId);
+  renderMover();
+});
+$("#mover-todos").addEventListener("change", e => {
+  const ids = alunosParaMover().map(a => a.id);
+  if (e.target.checked) ids.forEach(id => ui.moverSelecionados.add(id));
+  else ids.forEach(id => ui.moverSelecionados.delete(id));
+  renderMover();
+});
+
+$("#btn-nova-turma").addEventListener("click", () => abrirCadastro("turma"));
+$("#btn-novo-aluno").addEventListener("click", () => abrirCadastro("aluno"));
+
+$("#linhas-turmas").addEventListener("click", e => {
+  const btn = e.target.closest("[data-acao]");
+  if (!btn) return;
+  const turma = ui.turmas.find(t => t.id === btn.closest("tr").dataset.id);
+  if (!turma) return;
+  if (btn.dataset.acao === "editar-turma") abrirCadastro("turma", turma);
+  if (btn.dataset.acao === "excluir-turma") excluirTurma(turma);
+});
+
+$("#linhas-alunos").addEventListener("click", e => {
+  const btn = e.target.closest("[data-acao]");
+  if (!btn) return;
+  const aluno = ui.alunos.find(a => a.id === btn.closest("tr").dataset.id);
+  if (!aluno) return;
+  if (btn.dataset.acao === "editar-aluno") abrirCadastro("aluno", aluno);
+  if (btn.dataset.acao === "excluir-aluno") excluirAluno(aluno);
+});
+
+function abrirCadastro(tipo, item = null) {
+  ui.cadastro = {tipo, item};
+  const editando = Boolean(item);
+  $("#cad-titulo").textContent = `${editando ? "Editar" : "Novo"} ${tipo === "turma" ? "turma" : "aluno"}`;
+  $("#cad-sub").textContent = tipo === "turma"
+    ? "Turmas são reutilizadas todo ano. Use um nome curto, como 6A ou 1EM."
+    : "O aluno sempre pertence a uma turma.";
+  const tamanho = tipo === "turma" ? 20 : 150;
+  let html = `<label for="cad-nome">${tipo === "turma" ? "Nome da turma" : "Nome do aluno"}</label>
+    <input id="cad-nome" maxlength="${tamanho}" autocomplete="off" value="${esc(item?.nome || "")}">
+    <small class="erro" data-erro="nome"></small>`;
+  if (tipo === "aluno") {
+    html += `<label for="cad-turma">Turma</label>
+      <select id="cad-turma"><option value="">Selecione a turma</option>
+        ${ui.turmas.map(t => `<option value="${esc(t.id)}">${esc(t.nome)}</option>`).join("")}
+      </select><small class="erro" data-erro="turmaId"></small>`;
+  }
+  $("#cad-campos").innerHTML = html;
+  if (tipo === "aluno") $("#cad-turma").value = item?.turmaId || "";
+  mostrarMsg($("#msg-cadastro"), "");
+  $("#dlg-cadastro").showModal();
+  $("#cad-nome").focus();
+}
+
+function fecharCadastro() {
+  $("#dlg-cadastro").close();
+  ui.cadastro = null;
+}
+
+$("#cad-cancelar").addEventListener("click", fecharCadastro);
+$("#dlg-cadastro").addEventListener("click", e => {
+  if (e.target === $("#dlg-cadastro") || e.target.closest("[data-fechar-cadastro]")) fecharCadastro();
+});
+$("#dlg-cadastro").addEventListener("close", () => { ui.cadastro = null; });
+
+$("#form-cadastro").addEventListener("submit", async e => {
+  e.preventDefault();
+  const cadastro = ui.cadastro;
+  if (!cadastro) return;
+  const nome = $("#cad-nome").value.trim();
+  const turmaId = cadastro.tipo === "aluno" ? $("#cad-turma").value : null;
+  $$(".erro", $("#form-cadastro")).forEach(el => { el.textContent = ""; });
+  let ok = true;
+  if (!nome) { erroCampo("nome", "Informe o nome.", $("#form-cadastro")); ok = false; }
+  if (cadastro.tipo === "aluno" && !turmaId) {
+    erroCampo("turmaId", "Escolha a turma.", $("#form-cadastro")); ok = false;
+  }
+  if (!ok) return;
+
+  const btn = $("#cad-salvar"), texto = btn.textContent;
+  btn.disabled = true; btn.textContent = "Salvando…";
+  try {
+    if (cadastro.tipo === "turma") {
+      if (cadastro.item) await Api.atualizarTurma(cadastro.item.id, nome);
+      else await Api.criarTurma(nome);
+    } else if (cadastro.item) {
+      await Api.atualizarAluno(cadastro.item.id, nome, turmaId);
+    } else {
+      await Api.criarAluno(nome, turmaId);
+    }
+    fecharCadastro();
+    avisar(cadastro.item ? "Cadastro atualizado." : "Cadastro criado.");
+    await carregarCadastros(true);
+    sincronizarControles();
+  } catch (err) {
+    if (tratarErroGlobal(err)) return;
+    if (err.status === 400 && err.campos) {
+      Object.entries(err.campos).forEach(([campo, msg]) => erroCampo(campo, msg, $("#form-cadastro")));
+    }
+    mostrarMsg($("#msg-cadastro"), err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = texto;
+  }
+});
+
+async function excluirTurma(turma) {
+  const quantidade = ui.alunos.filter(a => a.turmaId === turma.id).length;
+  const ok = await confirmar({
+    titulo: "Excluir turma?",
+    texto: `A turma ${turma.nome} será removida do cadastro. A exclusão é bloqueada se houver alunos ou ocorrências vinculadas.${quantidade ? ` No momento, há ${plural(quantidade, "aluno ativo", "alunos ativos")} nesta turma.` : ""}`,
+    botao: "Excluir",
+    perigo: true
+  });
+  if (!ok) return;
+  try {
+    await Api.excluirTurma(turma.id);
+    avisar("Turma excluída.");
+    await carregarCadastros(true);
+    sincronizarControles();
+  } catch (e) {
+    if (tratarErroGlobal(e)) return;
+    avisar(e.message);
+  }
+}
+
+async function excluirAluno(aluno) {
+  const ok = await confirmar({
+    titulo: "Excluir aluno?",
+    texto: `${aluno.nome} deixará de aparecer nas listas e não poderá ser usado em novas ocorrências. As ocorrências e o histórico já registrados serão preservados.`,
+    botao: "Excluir",
+    perigo: true,
+    cancelar: "Voltar",
+    cancelarPrimario: true
+  });
+  if (!ok) return;
+  try {
+    await Api.excluirAluno(aluno.id);
+    ui.moverSelecionados.delete(aluno.id);
+    avisar("Aluno excluído. Ocorrências e histórico foram preservados.");
+    await carregarCadastros(true);
+  } catch (e) {
+    if (tratarErroGlobal(e)) return;
+    avisar(e.message);
+  }
+}
+
+$("#btn-mover").addEventListener("click", async () => {
+  const destino = $("#mover-destino").value;
+  const turma = ui.turmas.find(t => t.id === destino);
+  const total = ui.moverSelecionados.size;
+  if (!destino || !total) return;
+  const ok = await confirmar({
+    titulo: "Mover alunos?",
+    texto: `Mover ${plural(total, "aluno selecionado", "alunos selecionados")} para a turma ${turma?.nome || "de destino"}? Ocorrências antigas mantêm a turma registrada na época.`,
+    botao: "Mover alunos"
+  });
+  if (!ok) return;
+  const btn = $("#btn-mover"), texto = btn.textContent;
+  btn.disabled = true; btn.textContent = "Movendo…";
+  try {
+    await Api.moverAlunos([...ui.moverSelecionados], destino);
+    ui.moverSelecionados.clear();
+    avisar(`${plural(total, "aluno movido", "alunos movidos")} para ${turma?.nome || "a turma de destino"}.`);
+    await carregarCadastros(true);
+    mostrarMsg($("#msg-mover"), "");
+    renderMover();
+  } catch (e) {
+    if (tratarErroGlobal(e)) return;
+    mostrarMsg($("#msg-mover"), e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = texto;
+    atualizarContagemMover();
+  }
+});
 
 async function carregarIndicadores() {
   try {

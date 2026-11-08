@@ -6,4 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface OcorrenciaRepository extends JpaRepository<Ocorrencia, UUID>, JpaSpecificationExecutor<Ocorrencia> {
+
+    boolean existsByAlunoId(UUID alunoId);
+
+    boolean existsByTurmaId(UUID turmaId);
 }

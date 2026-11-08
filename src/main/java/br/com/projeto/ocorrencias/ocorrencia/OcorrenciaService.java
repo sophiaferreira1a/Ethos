@@ -4,6 +4,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
 
@@ -18,8 +20,10 @@ import br.com.projeto.ocorrencias.aluno.Aluno;
 import br.com.projeto.ocorrencias.aluno.AlunoRepository;
 import br.com.projeto.ocorrencias.historico.AcaoHistorico;
 import br.com.projeto.ocorrencias.historico.HistoricoService;
+import br.com.projeto.ocorrencias.ocorrencia.dto.OcorrenciaLoteRequest;
 import br.com.projeto.ocorrencias.ocorrencia.dto.OcorrenciaRequest;
 import br.com.projeto.ocorrencias.ocorrencia.dto.OcorrenciaResponse;
+import br.com.projeto.ocorrencias.turma.Turma;
 import br.com.projeto.ocorrencias.usuario.Role;
 import br.com.projeto.ocorrencias.usuario.Usuario;
 import br.com.projeto.ocorrencias.usuario.UsuarioLogado;
@@ -78,6 +82,47 @@ public class OcorrenciaService {
         return OcorrenciaResponse.de(salva);
     }
 
+    /**
+     * Cria uma ocorrencia por aluno selecionado, tudo na mesma transacao.
+     * Se qualquer aluno estiver invalido, nada e gravado.
+     */
+    @Transactional
+    public List<OcorrenciaResponse> criarLote(OcorrenciaLoteRequest dados) {
+        if (usuarioLogado.role() != Role.PROFESSOR) {
+            throw new AccessDeniedException("Apenas o professor registra ocorrencia");
+        }
+        if (dados == null || dados.alunoIds() == null || dados.alunoIds().isEmpty()) {
+            throw new DadosOcorrenciaInvalidosException("Selecione ao menos um aluno");
+        }
+        Conteudo conteudo = validarConteudo(dados.tipo(), dados.descricao(),
+                dados.medidasTomadas(), dados.medidasSugeridas(), dados.data());
+        conferirData(conteudo.data());
+
+        List<UUID> ids = new LinkedHashSet<>(dados.alunoIds()).stream().toList();
+        List<Aluno> selecionados = alunos.findAllComTurmaByIdIn(ids);
+        if (selecionados.size() != ids.size()) {
+            throw new EntityNotFoundException("Aluno nao encontrado ou excluido");
+        }
+        Turma turma = selecionados.getFirst().getTurma();
+        if (selecionados.stream().anyMatch(aluno -> !aluno.getTurma().getId().equals(turma.getId()))) {
+            throw new DadosOcorrenciaInvalidosException("Selecione alunos da mesma turma");
+        }
+        conferirTurma(dados.turma(), selecionados.getFirst());
+
+        Usuario professor = usuarioLogado.usuario();
+        List<Ocorrencia> novas = new ArrayList<>();
+        for (Aluno aluno : selecionados) {
+            novas.add(new Ocorrencia(aluno, professor, conteudo.tipo(), conteudo.descricao(),
+                    conteudo.medidas(), conteudo.medidasSugeridas(), conteudo.data()));
+        }
+        List<Ocorrencia> salvas = repositorio.saveAllAndFlush(novas);
+        for (Ocorrencia ocorrencia : salvas) {
+            historico.registrar(ocorrencia.getId(), professor.getId(),
+                    AcaoHistorico.OCORRENCIA_CRIADA.name(), "criada pelo professor");
+        }
+        return salvas.stream().map(OcorrenciaResponse::de).toList();
+    }
+
     public OcorrenciaResponse buscar(UUID id) {
         Ocorrencia ocorrencia = carregar(id);
         if (ocorrencia.getCanceladaEm() != null) {
@@ -102,8 +147,15 @@ public class OcorrenciaService {
         Ocorrencia ocorrencia = carregar(id);
         exigirPodeAlterar(ocorrencia);
         Conteudo conteudo = conteudo(dados);
-        Aluno aluno = buscarAluno(dados.aluno().id());
-        conferirTurma(dados.turma(), aluno);
+        // O aluno da ocorrencia pode estar excluido (soft delete): nesse caso ele
+        // continua valido para corrigir a ocorrencia antiga, mas nao para uma nova.
+        Aluno alunoAtual = ocorrencia.getAluno();
+        boolean mesmoAluno = alunoAtual.getId().equals(dados.aluno().id());
+        Aluno aluno = mesmoAluno ? alunoAtual : buscarAluno(dados.aluno().id());
+        String turmaEsperada = mesmoAluno
+                ? ocorrencia.getTurma().getNome()
+                : aluno.getTurma().getNome();
+        conferirTurma(dados.turma(), turmaEsperada);
         conferirData(conteudo.data());
         ocorrencia.atualizar(aluno, conteudo.tipo(), conteudo.descricao(),
                 conteudo.medidas(), conteudo.medidasSugeridas(), conteudo.data());
@@ -164,34 +216,43 @@ public class OcorrenciaService {
         if (dados == null || dados.aluno() == null || dados.aluno().id() == null) {
             throw new DadosOcorrenciaInvalidosException("Informe o aluno");
         }
-        if (dados.tipo() == null) {
+        return validarConteudo(dados.tipo(), dados.descricao(), dados.medidasTomadas(),
+                dados.medidasSugeridas(), dados.data());
+    }
+
+    private Conteudo validarConteudo(TipoOcorrencia tipo, String descricaoInformada,
+                                     String medidasInformadas, String medidasSugeridasInformadas,
+                                     LocalDate data) {
+        if (tipo == null) {
             throw new DadosOcorrenciaInvalidosException("Informe o tipo da ocorrencia");
         }
-        String descricao = dados.descricao() == null ? "" : dados.descricao().trim();
+        String descricao = descricaoInformada == null ? "" : descricaoInformada.trim();
         if (descricao.length() < DESCRICAO_MINIMA) {
             throw new DadosOcorrenciaInvalidosException("Descricao deve ter ao menos 10 caracteres");
         }
-        if (dados.medidasTomadas() == null || dados.medidasTomadas().isBlank()) {
+        if (medidasInformadas == null || medidasInformadas.isBlank()) {
             throw new DadosOcorrenciaInvalidosException("Informe as medidas tomadas");
         }
-        String medidasSugeridas = dados.medidasSugeridas() == null
+        String medidasSugeridas = medidasSugeridasInformadas == null
                 ? null
-                : dados.medidasSugeridas().trim();
+                : medidasSugeridasInformadas.trim();
         if (medidasSugeridas != null && medidasSugeridas.isEmpty()) {
             medidasSugeridas = null;
         }
-        if (dados.data() == null) {
+        if (data == null) {
             throw new DadosOcorrenciaInvalidosException("Informe a data da ocorrencia");
         }
-        return new Conteudo(dados.tipo(), descricao, dados.medidasTomadas().trim(),
-                medidasSugeridas, dados.data());
+        return new Conteudo(tipo, descricao, medidasInformadas.trim(), medidasSugeridas, data);
     }
 
     private void conferirTurma(String turmaInformada, Aluno aluno) {
+        conferirTurma(turmaInformada, aluno.getTurma().getNome());
+    }
+
+    private void conferirTurma(String turmaInformada, String esperada) {
         if (turmaInformada == null || turmaInformada.isBlank()) {
             return;
         }
-        String esperada = aluno.getTurma().getNome();
         if (!turmaInformada.trim().equalsIgnoreCase(esperada)) {
             throw new DadosOcorrenciaInvalidosException("Turma informada nao corresponde a turma do aluno");
         }

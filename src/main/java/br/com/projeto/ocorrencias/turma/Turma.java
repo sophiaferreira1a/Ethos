@@ -40,6 +40,10 @@ public class Turma {
         return nome;
     }
 
+    public void renomear(String nome) {
+        this.nome = nome;
+    }
+
     @Override
     public boolean equals(Object outro) {
         if (this == outro) {

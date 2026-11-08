@@ -3,9 +3,12 @@ package br.com.projeto.ocorrencias.ocorrencia;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -14,6 +17,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,6 +38,7 @@ import br.com.projeto.ocorrencias.aluno.Aluno;
 import br.com.projeto.ocorrencias.aluno.AlunoRepository;
 import br.com.projeto.ocorrencias.historico.AcaoHistorico;
 import br.com.projeto.ocorrencias.historico.HistoricoService;
+import br.com.projeto.ocorrencias.ocorrencia.dto.OcorrenciaLoteRequest;
 import br.com.projeto.ocorrencias.ocorrencia.dto.OcorrenciaRequest;
 import br.com.projeto.ocorrencias.ocorrencia.dto.OcorrenciaResponse;
 import br.com.projeto.ocorrencias.turma.Turma;
@@ -63,6 +68,7 @@ class OcorrenciaServiceTest {
     private OcorrenciaService servico;
     private Turma turma;
     private Aluno aluno;
+    private Aluno outroAluno;
     private Usuario professor;
     private UUID idGerado;
 
@@ -74,6 +80,8 @@ class OcorrenciaServiceTest {
         ReflectionTestUtils.setField(turma, "id", UUID.randomUUID());
         aluno = new Aluno("Ana Clara Souza", turma);
         ReflectionTestUtils.setField(aluno, "id", UUID.randomUUID());
+        outroAluno = new Aluno("Bruno Henrique Lima", turma);
+        ReflectionTestUtils.setField(outroAluno, "id", UUID.randomUUID());
         professor = usuario("Maria Silva", "professor@escola.com", Role.PROFESSOR);
         idGerado = UUID.randomUUID();
 
@@ -184,6 +192,90 @@ class OcorrenciaServiceTest {
     }
 
     @Test
+    void criarLoteGravaUmaOcorrenciaPorAlunoERegistraUmHistoricoParaCada() {
+        when(alunos.findAllComTurmaByIdIn(List.of(aluno.getId(), outroAluno.getId())))
+                .thenReturn(List.of(aluno, outroAluno));
+        when(repositorio.saveAllAndFlush(anyList())).thenAnswer(chamada -> {
+            List<Ocorrencia> lista = chamada.getArgument(0);
+            List<Ocorrencia> salvas = new ArrayList<>();
+            for (int indice = 0; indice < lista.size(); indice++) {
+                Ocorrencia ocorrencia = lista.get(indice);
+                ReflectionTestUtils.setField(ocorrencia, "id",
+                        indice == 0 ? idGerado : UUID.randomUUID());
+                salvas.add(ocorrencia);
+            }
+            return salvas;
+        });
+
+        List<OcorrenciaResponse> respostas = servico.criarLote(loteValido(
+                List.of(aluno.getId(), outroAluno.getId()), " 6a "));
+
+        assertThat(respostas).hasSize(2);
+        assertThat(respostas.getFirst().alunoNome()).isEqualTo("Ana Clara Souza");
+        assertThat(respostas.get(1).alunoNome()).isEqualTo("Bruno Henrique Lima");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Ocorrencia>> captor = ArgumentCaptor.forClass(List.class);
+        verify(repositorio).saveAllAndFlush(captor.capture());
+        List<Ocorrencia> salvas = captor.getValue();
+        assertThat(salvas).hasSize(2);
+        assertThat(salvas).allSatisfy(ocorrencia -> {
+            assertThat(ocorrencia.getTurma()).isSameAs(turma);
+            assertThat(ocorrencia.getProfessor()).isSameAs(professor);
+            assertThat(ocorrencia.getStatusLancamento()).isEqualTo(StatusLancamento.NAO_LANCADA);
+            assertThat(ocorrencia.getDescricao()).isEqualTo("Aluno interrompeu a aula varias vezes.");
+        });
+        verify(historico, times(2)).registrar(any(), eq(professor.getId()),
+                eq(AcaoHistorico.OCORRENCIA_CRIADA.name()), eq("criada pelo professor"));
+    }
+
+    @Test
+    void criarLoteComAlunosDeTurmasDiferentesNaoGravaNada() {
+        Turma outraTurma = new Turma("7A");
+        ReflectionTestUtils.setField(outraTurma, "id", UUID.randomUUID());
+        Aluno deOutraTurma = new Aluno("Carla Souza", outraTurma);
+        ReflectionTestUtils.setField(deOutraTurma, "id", UUID.randomUUID());
+        when(alunos.findAllComTurmaByIdIn(List.of(aluno.getId(), deOutraTurma.getId())))
+                .thenReturn(List.of(aluno, deOutraTurma));
+
+        assertThatThrownBy(() -> servico.criarLote(loteValido(
+                List.of(aluno.getId(), deOutraTurma.getId()), "6A")))
+                .isInstanceOf(DadosOcorrenciaInvalidosException.class)
+                .hasMessageContaining("mesma turma");
+
+        verify(repositorio, never()).saveAllAndFlush(anyList());
+        verifyNoInteractions(historico);
+    }
+
+    @Test
+    void criarLoteComAlunoInexistenteOuExcluidoNaoGravaNada() {
+        UUID excluido = UUID.randomUUID();
+        when(alunos.findAllComTurmaByIdIn(List.of(aluno.getId(), excluido)))
+                .thenReturn(List.of(aluno));
+
+        assertThatThrownBy(() -> servico.criarLote(loteValido(
+                List.of(aluno.getId(), excluido), "6A")))
+                .isInstanceOf(EntityNotFoundException.class);
+
+        verify(repositorio, never()).saveAllAndFlush(anyList());
+        verifyNoInteractions(historico);
+    }
+
+    @Test
+    void criarLoteExigePerfilDeProfessorESelecaoNaoVazia() {
+        when(usuarioLogado.role()).thenReturn(Role.COORDENACAO);
+        assertThatThrownBy(() -> servico.criarLote(loteValido(List.of(aluno.getId()), "6A")))
+                .isInstanceOf(AccessDeniedException.class);
+
+        when(usuarioLogado.role()).thenReturn(Role.PROFESSOR);
+        assertThatThrownBy(() -> servico.criarLote(loteValido(List.of(), "6A")))
+                .isInstanceOf(DadosOcorrenciaInvalidosException.class)
+                .hasMessageContaining("aluno");
+
+        verifyNoInteractions(historico);
+    }
+
+    @Test
     void lancarPreencheDataEResponsavelERegistraHistorico() {
         Usuario coordenacao = usuario("Ana Coordenacao", "coordenacao@escola.com", Role.COORDENACAO);
         when(usuarioLogado.isCoordenacao()).thenReturn(true);
@@ -225,7 +317,6 @@ class OcorrenciaServiceTest {
 
     @Test
     void autorAtualizaOcorrenciaNaoLancadaERegistraHistorico() {
-        when(alunos.findComTurmaById(aluno.getId())).thenReturn(Optional.of(aluno));
         Ocorrencia ocorrencia = ocorrenciaPersistida();
         when(repositorio.findById(idGerado)).thenReturn(Optional.of(ocorrencia));
 
@@ -237,6 +328,27 @@ class OcorrenciaServiceTest {
         assertThat(ocorrencia.getData()).isEqualTo(LocalDate.of(2026, 10, 29));
         assertThat(ocorrencia.getProfessor()).isSameAs(professor);
         assertThat(resposta.statusLancamento()).isEqualTo(StatusLancamento.NAO_LANCADA);
+        verify(historico).registrar(idGerado, professor.getId(),
+                AcaoHistorico.OCORRENCIA_ATUALIZADA.name(), "atualizada");
+    }
+
+    @Test
+    void atualizarOcorrenciaDeAlunoMovidoEExcluidoPreservaTurmaDaEpoca() {
+        Ocorrencia ocorrencia = ocorrenciaPersistida();
+        Turma destino = new Turma("7A");
+        ReflectionTestUtils.setField(destino, "id", UUID.randomUUID());
+        aluno.moverPara(destino);
+        aluno.excluir(Instant.now(relogio));
+        when(repositorio.findById(idGerado)).thenReturn(Optional.of(ocorrencia));
+
+        OcorrenciaResponse resposta = servico.atualizar(idGerado, pedido("6A",
+                "Descricao corrigida depois da movimentacao.", "Advertencia verbal",
+                LocalDate.of(2026, 10, 29)));
+
+        assertThat(ocorrencia.getTurma().getNome()).isEqualTo("6A");
+        assertThat(resposta.turmaNome()).isEqualTo("6A");
+        assertThat(ocorrencia.getAluno().getTurma().getNome()).isEqualTo("7A");
+        assertThat(ocorrencia.getAluno().getExcluidoEm()).isNotNull();
         verify(historico).registrar(idGerado, professor.getId(),
                 AcaoHistorico.OCORRENCIA_ATUALIZADA.name(), "atualizada");
     }
@@ -260,7 +372,6 @@ class OcorrenciaServiceTest {
         when(usuarioLogado.isCoordenacao()).thenReturn(true);
         Usuario coordenacao = usuario("Ana Coordenacao", "coordenacao@escola.com", Role.COORDENACAO);
         when(usuarioLogado.id()).thenReturn(coordenacao.getId());
-        when(alunos.findComTurmaById(aluno.getId())).thenReturn(Optional.of(aluno));
         when(repositorio.findById(idGerado)).thenReturn(Optional.of(ocorrenciaPersistida()));
 
         servico.atualizar(idGerado, pedidoValido());
@@ -346,6 +457,7 @@ class OcorrenciaServiceTest {
     @Test
     void operacoesQueGravamSaoTransacionais() throws Exception {
         assertTransacional("criar", OcorrenciaRequest.class);
+        assertTransacional("criarLote", OcorrenciaLoteRequest.class);
         assertTransacional("atualizar", UUID.class, OcorrenciaRequest.class);
         assertTransacional("excluir", UUID.class);
         assertTransacional("lancar", UUID.class);
@@ -366,6 +478,17 @@ class OcorrenciaServiceTest {
     private OcorrenciaRequest pedidoValido() {
         return pedido("6A", "Aluno interrompeu a aula varias vezes.", "Conversa com o aluno",
                 "Suspensão", LocalDate.of(2026, 10, 30));
+    }
+
+    private OcorrenciaLoteRequest loteValido(List<UUID> alunoIds, String turmaNome) {
+        return new OcorrenciaLoteRequest(
+                alunoIds,
+                turmaNome,
+                TipoOcorrencia.INDISCIPLINA,
+                "Aluno interrompeu a aula varias vezes.",
+                "Conversa com o aluno",
+                "Suspensão",
+                LocalDate.of(2026, 10, 30));
     }
 
     private OcorrenciaRequest pedido(String turmaNome, String descricao, String medidas, LocalDate data) {

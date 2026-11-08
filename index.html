@@ -60,16 +60,25 @@
       <p id="passo-info" class="sub" aria-live="polite"></p>
 
       <form id="form-oc" novalidate>
-        <!-- 1: aluno -->
+        <!-- 1: alunos -->
         <fieldset class="passo" data-passo="1">
-          <legend>Quem é o aluno?</legend>
+          <legend>Quem são os alunos?</legend>
+          <p class="sub">Escolha a turma e selecione um ou mais alunos. Cada aluno selecionado gera uma ocorrência própria.</p>
           <label for="turma">Turma</label>
           <select id="turma"></select>
+          <small class="erro" data-erro="turma"></small>
 
           <label for="busca">Buscar aluno</label>
-          <input id="busca" type="search" autocomplete="off" placeholder="Digite o nome do aluno">
-          <ul id="lista-alunos" class="lista" role="listbox" aria-label="Alunos"></ul>
-          <div id="aluno-sel" class="chip" hidden></div>
+          <input id="busca" type="search" autocomplete="off" placeholder="Escolha a turma primeiro" disabled>
+          <ul id="lista-alunos" class="lista" role="listbox" aria-label="Alunos" aria-multiselectable="true"></ul>
+
+          <div id="alunos-sel" class="selecao" hidden>
+            <div class="selecao-topo">
+              <strong id="sel-cont"></strong>
+              <button id="limpar-sel" class="btn texto" type="button">Limpar seleção</button>
+            </div>
+            <ul id="lista-sel" class="chips"></ul>
+          </div>
           <small class="erro" data-erro="aluno"></small>
         </fieldset>
 

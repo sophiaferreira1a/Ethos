@@ -45,6 +45,12 @@ public class RestExceptionHandler {
         return new ErroResposta(HttpStatus.CONFLICT.value(), excecao.getMessage());
     }
 
+    @ExceptionHandler(ConflitoCadastroException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErroResposta conflitoCadastro(ConflitoCadastroException excecao) {
+        return new ErroResposta(HttpStatus.CONFLICT.value(), excecao.getMessage());
+    }
+
     @ExceptionHandler(EntityNotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErroResposta naoEncontrado(EntityNotFoundException excecao) {

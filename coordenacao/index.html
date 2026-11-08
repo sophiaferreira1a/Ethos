@@ -53,105 +53,213 @@
   </header>
 
   <main class="painel-coord">
-    <section class="cabecalho">
-      <h1>Ocorrências</h1>
-      <p class="sub">Acompanhe o que ainda precisa ser lançado no sistema oficial do colégio.</p>
+    <nav class="abas-principais" role="tablist" aria-label="Áreas da coordenação">
+      <button class="aba" id="aba-btn-ocorrencias" type="button" role="tab" data-aba="ocorrencias"
+        aria-selected="true" aria-controls="aba-ocorrencias">Ocorrências</button>
+      <button class="aba" id="aba-btn-cadastros" type="button" role="tab" data-aba="cadastros"
+        aria-selected="false" aria-controls="aba-cadastros">Cadastros</button>
+    </nav>
+
+    <section id="aba-ocorrencias" role="tabpanel" aria-labelledby="aba-btn-ocorrencias">
+      <section class="cabecalho">
+        <h1>Ocorrências</h1>
+        <p class="sub">Acompanhe o que ainda precisa ser lançado no sistema oficial do colégio.</p>
+      </section>
+
+      <section class="fila" aria-label="Situação das ocorrências">
+        <button class="fila-item pendente" type="button" data-status="NAO_LANCADA" aria-pressed="true">
+          <span class="fila-num" id="ind-nao">–</span>
+          <span class="fila-txt">Não lançadas</span>
+        </button>
+        <button class="fila-item" type="button" data-status="LANCADA" aria-pressed="false">
+          <span class="fila-num" id="ind-lancadas">–</span>
+          <span class="fila-txt">Lançadas</span>
+        </button>
+        <button class="fila-item" type="button" data-status="" aria-pressed="false">
+          <span class="fila-num" id="ind-total">–</span>
+          <span class="fila-txt">Total</span>
+        </button>
+      </section>
+
+      <section class="filtros-area" aria-label="Busca e filtros">
+        <div class="busca">
+          <label for="f-aluno" class="sr">Buscar aluno</label>
+          <input id="f-aluno" type="search" autocomplete="off" placeholder="Buscar aluno pelo nome">
+        </div>
+        <details id="filtros" class="filtros">
+          <summary>Filtros <span id="filtros-ativos" class="contagem" hidden></span></summary>
+          <div class="filtros-grade">
+            <div>
+              <label for="f-turma">Turma</label>
+              <select id="f-turma"><option value="">Todas</option></select>
+            </div>
+            <div>
+              <label for="f-tipo">Tipo</label>
+              <select id="f-tipo"><option value="">Todos</option></select>
+            </div>
+            <div>
+              <label for="f-status">Situação</label>
+              <select id="f-status">
+                <option value="">Todas</option>
+                <option value="NAO_LANCADA">Não lançada</option>
+                <option value="LANCADA">Lançada</option>
+              </select>
+            </div>
+            <div>
+              <label for="f-inicio">De</label>
+              <input id="f-inicio" type="date">
+            </div>
+            <div>
+              <label for="f-fim">Até</label>
+              <input id="f-fim" type="date">
+            </div>
+            <div>
+              <label for="f-ordem">Ordem</label>
+              <select id="f-ordem">
+                <option value="data,desc">Mais recentes</option>
+                <option value="data,asc">Mais antigas</option>
+              </select>
+            </div>
+          </div>
+          <small class="erro" data-erro="periodo"></small>
+          <button id="btn-limpar" class="btn texto" type="button">Limpar filtros</button>
+        </details>
+      </section>
+
+      <section aria-labelledby="resultado">
+        <div class="resultado-linha">
+          <p id="resultado" class="resultado" aria-live="polite"></p>
+          <button id="btn-exportar" class="btn secundario pequeno" type="button">Exportar planilha</button>
+        </div>
+        <div id="msg-lista" class="msg" role="alert" hidden></div>
+
+        <div class="tabela-wrap">
+          <table class="tabela" id="tabela">
+            <caption class="sr">Ocorrências registradas pelos professores</caption>
+            <thead>
+              <tr>
+                <th scope="col">Data</th>
+                <th scope="col">Aluno</th>
+                <th scope="col">Tipo</th>
+                <th scope="col">Professor</th>
+                <th scope="col">Situação</th>
+                <th scope="col"><span class="sr">Ações</span></th>
+              </tr>
+            </thead>
+            <tbody id="linhas"></tbody>
+          </table>
+        </div>
+
+        <div id="vazio" class="vazio-lista" hidden>
+          <p id="vazio-txt"></p>
+          <button id="vazio-limpar" class="btn secundario" type="button" hidden>Limpar filtros</button>
+        </div>
+
+        <nav class="paginacao" id="paginacao" aria-label="Paginação" hidden>
+          <button id="pag-ant" class="btn secundario pequeno" type="button">Anterior</button>
+          <span id="pag-info" class="sub"></span>
+          <button id="pag-prox" class="btn secundario pequeno" type="button">Próxima</button>
+        </nav>
+      </section>
     </section>
 
-    <section class="fila" aria-label="Situação das ocorrências">
-      <button class="fila-item pendente" type="button" data-status="NAO_LANCADA" aria-pressed="true">
-        <span class="fila-num" id="ind-nao">–</span>
-        <span class="fila-txt">Não lançadas</span>
-      </button>
-      <button class="fila-item" type="button" data-status="LANCADA" aria-pressed="false">
-        <span class="fila-num" id="ind-lancadas">–</span>
-        <span class="fila-txt">Lançadas</span>
-      </button>
-      <button class="fila-item" type="button" data-status="" aria-pressed="false">
-        <span class="fila-num" id="ind-total">–</span>
-        <span class="fila-txt">Total</span>
-      </button>
-    </section>
+    <section id="aba-cadastros" role="tabpanel" aria-labelledby="aba-btn-cadastros" hidden>
+      <section class="cabecalho">
+        <h1>Cadastros</h1>
+        <p class="sub">Gerencie turmas e alunos e organize a movimentação anual.</p>
+      </section>
 
-    <section class="filtros-area" aria-label="Busca e filtros">
-      <div class="busca">
-        <label for="f-aluno" class="sr">Buscar aluno</label>
-        <input id="f-aluno" type="search" autocomplete="off" placeholder="Buscar aluno pelo nome">
-      </div>
-      <details id="filtros" class="filtros">
-        <summary>Filtros <span id="filtros-ativos" class="contagem" hidden></span></summary>
-        <div class="filtros-grade">
+      <nav class="subabas" role="tablist" aria-label="Cadastros">
+        <button class="subaba" type="button" role="tab" data-ir-subaba="turmas" aria-selected="true">Turmas</button>
+        <button class="subaba" type="button" role="tab" data-ir-subaba="alunos" aria-selected="false">Alunos</button>
+        <button class="subaba" type="button" role="tab" data-ir-subaba="montar" aria-selected="false">Montar turmas</button>
+      </nav>
+
+      <section class="subaba-painel" data-painel-subaba="turmas" role="tabpanel">
+        <div class="cadastro-topo">
           <div>
-            <label for="f-turma">Turma</label>
-            <select id="f-turma"><option value="">Todas</option></select>
+            <h2>Turmas</h2>
+            <p class="sub">As turmas são reutilizadas a cada ano. Exclua apenas turmas sem alunos ou ocorrências.</p>
+          </div>
+          <button id="btn-nova-turma" class="btn primario" type="button">Nova turma</button>
+        </div>
+        <div id="msg-turmas" class="msg" role="alert" hidden></div>
+        <div class="tabela-wrap">
+          <table class="tabela" id="tabela-turmas">
+            <caption class="sr">Turmas cadastradas</caption>
+            <thead><tr><th scope="col">Turma</th><th scope="col">Alunos ativos</th><th scope="col"><span class="sr">Ações</span></th></tr></thead>
+            <tbody id="linhas-turmas"></tbody>
+          </table>
+        </div>
+        <div id="vazio-turmas" class="vazio-lista" hidden><p>Nenhuma turma cadastrada.</p></div>
+      </section>
+
+      <section class="subaba-painel" data-painel-subaba="alunos" role="tabpanel" hidden>
+        <div class="cadastro-topo">
+          <div>
+            <h2>Alunos</h2>
+            <p class="sub">A exclusão é lógica: o aluno sai das listas, mas ocorrências e históricos são preservados.</p>
+          </div>
+          <button id="btn-novo-aluno" class="btn primario" type="button">Novo aluno</button>
+        </div>
+        <div class="cadastro-filtros">
+          <div>
+            <label for="cad-busca-aluno" class="sr">Buscar aluno</label>
+            <input id="cad-busca-aluno" type="search" autocomplete="off" placeholder="Buscar aluno pelo nome">
           </div>
           <div>
-            <label for="f-tipo">Tipo</label>
-            <select id="f-tipo"><option value="">Todos</option></select>
-          </div>
-          <div>
-            <label for="f-status">Situação</label>
-            <select id="f-status">
-              <option value="">Todas</option>
-              <option value="NAO_LANCADA">Não lançada</option>
-              <option value="LANCADA">Lançada</option>
-            </select>
-          </div>
-          <div>
-            <label for="f-inicio">De</label>
-            <input id="f-inicio" type="date">
-          </div>
-          <div>
-            <label for="f-fim">Até</label>
-            <input id="f-fim" type="date">
-          </div>
-          <div>
-            <label for="f-ordem">Ordem</label>
-            <select id="f-ordem">
-              <option value="data,desc">Mais recentes</option>
-              <option value="data,asc">Mais antigas</option>
-            </select>
+            <label for="cad-filtro-turma" class="sr">Filtrar por turma</label>
+            <select id="cad-filtro-turma"><option value="">Todas as turmas</option></select>
           </div>
         </div>
-        <small class="erro" data-erro="periodo"></small>
-        <button id="btn-limpar" class="btn texto" type="button">Limpar filtros</button>
-      </details>
-    </section>
+        <div id="msg-alunos" class="msg" role="alert" hidden></div>
+        <div class="tabela-wrap">
+          <table class="tabela" id="tabela-alunos">
+            <caption class="sr">Alunos ativos</caption>
+            <thead><tr><th scope="col">Aluno</th><th scope="col">Turma</th><th scope="col"><span class="sr">Ações</span></th></tr></thead>
+            <tbody id="linhas-alunos"></tbody>
+          </table>
+        </div>
+        <div id="vazio-alunos" class="vazio-lista" hidden><p>Nenhum aluno encontrado.</p></div>
+      </section>
 
-    <section aria-labelledby="resultado">
-      <div class="resultado-linha">
-        <p id="resultado" class="resultado" aria-live="polite"></p>
-        <button id="btn-exportar" class="btn secundario pequeno" type="button">Exportar planilha</button>
-      </div>
-      <div id="msg-lista" class="msg" role="alert" hidden></div>
-
-      <div class="tabela-wrap">
-        <table class="tabela" id="tabela">
-          <caption class="sr">Ocorrências registradas pelos professores</caption>
-          <thead>
-            <tr>
-              <th scope="col">Data</th>
-              <th scope="col">Aluno</th>
-              <th scope="col">Tipo</th>
-              <th scope="col">Professor</th>
-              <th scope="col">Situação</th>
-              <th scope="col"><span class="sr">Ações</span></th>
-            </tr>
-          </thead>
-          <tbody id="linhas"></tbody>
-        </table>
-      </div>
-
-      <div id="vazio" class="vazio-lista" hidden>
-        <p id="vazio-txt"></p>
-        <button id="vazio-limpar" class="btn secundario" type="button" hidden>Limpar filtros</button>
-      </div>
-
-      <nav class="paginacao" id="paginacao" aria-label="Paginação" hidden>
-        <button id="pag-ant" class="btn secundario pequeno" type="button">Anterior</button>
-        <span id="pag-info" class="sub"></span>
-        <button id="pag-prox" class="btn secundario pequeno" type="button">Próxima</button>
-      </nav>
+      <section class="subaba-painel" data-painel-subaba="montar" role="tabpanel" hidden>
+        <div class="cadastro-topo">
+          <div>
+            <h2>Montar turmas</h2>
+            <p class="sub">Selecione os alunos e mova todos de uma vez para a turma de destino. Ocorrências antigas mantêm a turma da época.</p>
+          </div>
+        </div>
+        <div class="lote-controles">
+          <div>
+            <label for="mover-origem">Turma de origem</label>
+            <select id="mover-origem"><option value="">Todas as turmas</option></select>
+          </div>
+          <div>
+            <label for="mover-destino">Turma de destino</label>
+            <select id="mover-destino"><option value="">Selecione a turma</option></select>
+          </div>
+        </div>
+        <div id="msg-mover" class="msg" role="alert" hidden></div>
+        <div class="tabela-wrap">
+          <table class="tabela" id="tabela-mover">
+            <caption class="sr">Alunos para movimentação</caption>
+            <thead>
+              <tr>
+                <th scope="col"><input id="mover-todos" type="checkbox" aria-label="Selecionar todos os alunos visíveis"></th>
+                <th scope="col">Aluno</th>
+                <th scope="col">Turma atual</th>
+              </tr>
+            </thead>
+            <tbody id="linhas-mover"></tbody>
+          </table>
+        </div>
+        <div id="vazio-mover" class="vazio-lista" hidden><p>Nenhum aluno encontrado para a turma de origem.</p></div>
+        <div class="lote-acoes">
+          <span id="mover-cont" class="sub">Nenhum aluno selecionado</span>
+          <button id="btn-mover" class="btn primario" type="button" disabled>Mover selecionados</button>
+        </div>
+      </section>
     </section>
   </main>
 </div>
@@ -172,8 +280,28 @@
     <h2 id="conf-titulo"></h2>
     <p id="conf-texto"></p>
     <div class="confirmar-acoes">
-      <button class="btn secundario" value="nao" type="submit">Cancelar</button>
+      <button id="conf-nao" class="btn secundario" value="nao" type="submit">Cancelar</button>
       <button id="conf-sim" class="btn primario" value="sim" type="submit"></button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlg-cadastro" class="cadastro-dialogo" aria-labelledby="cad-titulo">
+  <form id="form-cadastro" novalidate>
+    <div class="gaveta-topo">
+      <div>
+        <h2 id="cad-titulo">Cadastro</h2>
+        <p id="cad-sub" class="sub"></p>
+      </div>
+      <button class="fechar" type="button" data-fechar-cadastro aria-label="Fechar">✕</button>
+    </div>
+    <div class="cadastro-corpo">
+      <div id="cad-campos"></div>
+      <div id="msg-cadastro" class="msg" role="alert" hidden></div>
+    </div>
+    <div class="cadastro-acoes">
+      <button id="cad-cancelar" class="btn secundario" type="button">Cancelar</button>
+      <button id="cad-salvar" class="btn primario" type="submit">Salvar</button>
     </div>
   </form>
 </dialog>

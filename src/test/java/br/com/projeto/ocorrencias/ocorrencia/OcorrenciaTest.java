@@ -75,6 +75,39 @@ class OcorrenciaTest {
     }
 
     @Test
+    void editarMesmoAlunoNaoTrocaTurmaDaEpoca() {
+        Ocorrencia ocorrencia = nova();
+        Aluno aluno = ocorrencia.getAluno();
+        Turma destino = new Turma("7A");
+        ReflectionTestUtils.setField(destino, "id", UUID.randomUUID());
+        aluno.moverPara(destino);
+
+        ocorrencia.atualizar(aluno, TipoOcorrencia.CELULAR,
+                "Descricao corrigida depois da movimentacao.", "Conversa com o aluno",
+                null, LocalDate.of(2026, 10, 29));
+
+        assertThat(ocorrencia.getTurma().getNome()).isEqualTo("6A");
+        assertThat(ocorrencia.getAluno().getTurma().getNome()).isEqualTo("7A");
+        assertThat(ocorrencia.getTipo()).isEqualTo(TipoOcorrencia.CELULAR);
+    }
+
+    @Test
+    void trocarAlunoAtualizaParaTurmaDoNovoAluno() {
+        Ocorrencia ocorrencia = nova();
+        Turma destino = new Turma("8B");
+        ReflectionTestUtils.setField(destino, "id", UUID.randomUUID());
+        Aluno novo = new Aluno("Bruno Henrique Lima", destino);
+        ReflectionTestUtils.setField(novo, "id", UUID.randomUUID());
+
+        ocorrencia.atualizar(novo, TipoOcorrencia.CELULAR,
+                "Descricao corrigida da ocorrencia.", "Conversa com o aluno",
+                null, LocalDate.of(2026, 10, 29));
+
+        assertThat(ocorrencia.getAluno()).isSameAs(novo);
+        assertThat(ocorrencia.getTurma().getNome()).isEqualTo("8B");
+    }
+
+    @Test
     void lancadaNaoCancela() {
         Ocorrencia ocorrencia = nova();
         Usuario coordenacao = usuario("Ana Coordenacao", "coordenacao@escola.com", Role.COORDENACAO);

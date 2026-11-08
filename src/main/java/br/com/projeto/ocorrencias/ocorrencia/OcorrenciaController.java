@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import br.com.projeto.ocorrencias.config.ErroResposta;
+import br.com.projeto.ocorrencias.ocorrencia.dto.OcorrenciaLoteRequest;
 import br.com.projeto.ocorrencias.ocorrencia.dto.OcorrenciaRequest;
 import br.com.projeto.ocorrencias.ocorrencia.dto.OcorrenciaResponse;
 import jakarta.validation.Valid;
@@ -46,6 +47,13 @@ public class OcorrenciaController {
     @PreAuthorize("hasRole('PROFESSOR')")
     public OcorrenciaResponse criar(@Valid @RequestBody OcorrenciaRequest dados) {
         return service.criar(dados);
+    }
+
+    @PostMapping("/lote")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasRole('PROFESSOR')")
+    public List<OcorrenciaResponse> criarLote(@Valid @RequestBody OcorrenciaLoteRequest dados) {
+        return service.criarLote(dados);
     }
 
     @GetMapping

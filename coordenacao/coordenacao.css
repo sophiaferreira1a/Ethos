@@ -144,3 +144,50 @@ dialog::backdrop{background:rgba(11,53,80,.45)}
 
 .resultado-linha{display:flex;align-items:center;justify-content:space-between;gap:.75rem;flex-wrap:wrap;margin:.25rem 0 .6rem}
 .resultado-linha .resultado{margin:0}
+
+/* Abas principais e sub-abas */
+.abas-principais{display:flex;gap:.25rem;border-bottom:1.5px solid var(--linha);margin-bottom:1.25rem;overflow-x:auto}
+.aba{font:700 1rem Inter,sans-serif;color:var(--suave);background:none;border:0;border-bottom:3px solid transparent;
+  min-height:48px;padding:0 1rem;cursor:pointer;white-space:nowrap}
+.aba:hover{color:var(--tinta)}
+.aba[aria-selected=true]{color:var(--tinta);border-bottom-color:var(--tinta)}
+.aba:focus-visible,.subaba:focus-visible{outline:3px solid var(--amarelo);outline-offset:2px;border-radius:6px}
+
+.subabas{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
+.subaba{font:600 .95rem Inter,sans-serif;color:var(--tinta);background:var(--superficie);border:1.5px solid var(--linha);
+  border-radius:99px;min-height:44px;padding:0 1rem;cursor:pointer}
+.subaba:hover{border-color:var(--tinta)}
+.subaba[aria-selected=true]{background:var(--tinta);border-color:var(--tinta);color:#fff}
+
+.cadastro-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+.cadastro-topo h2{font:800 1.35rem/1.2 "Bricolage Grotesque",Inter,sans-serif;letter-spacing:-.015em;margin-bottom:.2rem}
+.cadastro-topo p{max-width:70ch}
+.cadastro-topo .btn,.lote-acoes .btn,.cadastro-acoes .btn{width:auto}
+.cadastro-filtros{display:grid;grid-template-columns:1fr minmax(180px,240px);gap:.6rem;margin-bottom:1rem}
+.cadastro-filtros label{margin-top:0}
+.cadastro-filtros input,.cadastro-filtros select{height:48px;min-height:48px;padding-top:0;padding-bottom:0}
+.lote-controles{display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem}
+.lote-controles label{margin-top:0}
+.lote-acoes{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-top:1rem}
+.col-check{width:52px;text-align:center}
+.col-check input{width:20px;height:20px;min-height:0;accent-color:var(--tinta);cursor:pointer}
+.tabela td.col-check{white-space:nowrap}
+
+@media(max-width:760px){
+  .tabela td.col-check{display:block;padding:.35rem 0}
+  .tabela td.col-check::before{content:none}
+}
+@media(max-width:600px){
+  .cadastro-filtros,.lote-controles{grid-template-columns:1fr}
+  .cadastro-topo .btn,.lote-acoes .btn{width:100%}
+}
+
+/* Diálogo de cadastro */
+.cadastro-dialogo{width:min(480px,calc(100% - 2rem));border-radius:18px;background:var(--superficie);margin:auto}
+.cadastro-dialogo form{display:grid}
+.cadastro-dialogo .gaveta-topo{position:static}
+.cadastro-corpo{padding:1.25rem;display:grid;gap:.35rem}
+.cadastro-corpo label:first-of-type{margin-top:0}
+.cadastro-acoes{display:flex;justify-content:flex-end;gap:.6rem;flex-wrap:wrap;padding:0 1.25rem 1.25rem}
+.btn.azul{background:#1D6FB8;border-color:#1D6FB8;color:#fff}
+@media(max-width:560px){.cadastro-acoes .btn{flex:1}}

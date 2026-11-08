@@ -107,6 +107,7 @@ public class SecurityConfig {
                         .requestMatchers("/error").permitAll()
 
                         // Ocorrencias (Mateus)
+                        .requestMatchers(HttpMethod.POST, "/ocorrencias/lote").hasRole("PROFESSOR")
                         .requestMatchers(HttpMethod.POST, "/ocorrencias").hasRole("PROFESSOR")
                         .requestMatchers(HttpMethod.GET, "/ocorrencias/*/historico").hasRole("COORDENACAO")
                         .requestMatchers(HttpMethod.GET, "/ocorrencias", "/ocorrencias/*").hasRole("COORDENACAO")
@@ -120,6 +121,12 @@ public class SecurityConfig {
 
                         // Consulta de alunos e turmas (busca do professor e filtros da coordenacao)
                         .requestMatchers(HttpMethod.GET, "/alunos", "/turmas").hasAnyRole("PROFESSOR", "COORDENACAO")
+
+                        // Cadastro de alunos e turmas: exclusivo da coordenacao
+                        .requestMatchers(HttpMethod.POST, "/alunos", "/turmas").hasRole("COORDENACAO")
+                        .requestMatchers(HttpMethod.PUT, "/alunos/*", "/turmas/*").hasRole("COORDENACAO")
+                        .requestMatchers(HttpMethod.DELETE, "/alunos/*", "/turmas/*").hasRole("COORDENACAO")
+                        .requestMatchers(HttpMethod.PATCH, "/alunos/turma").hasRole("COORDENACAO")
 
                         .anyRequest().authenticated());
 

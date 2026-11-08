@@ -31,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import br.com.projeto.ocorrencias.config.RestExceptionHandler;
 import br.com.projeto.ocorrencias.config.SecurityConfig;
+import br.com.projeto.ocorrencias.ocorrencia.dto.OcorrenciaLoteRequest;
 import br.com.projeto.ocorrencias.ocorrencia.dto.OcorrenciaRequest;
 import br.com.projeto.ocorrencias.ocorrencia.dto.OcorrenciaResponse;
 import br.com.projeto.ocorrencias.usuario.UsuarioLogado;
@@ -100,6 +101,44 @@ class OcorrenciaControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(corpo()))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @WithMockUser(roles = "PROFESSOR")
+    void professorCriaOcorrenciasEmLote() throws Exception {
+        when(service.criarLote(any(OcorrenciaLoteRequest.class))).thenReturn(List.of(resposta(), resposta()));
+
+        mvc.perform(post("/ocorrencias/lote")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoLote()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].alunoNome").value("Ana Clara Souza"));
+
+        verify(service).criarLote(any(OcorrenciaLoteRequest.class));
+    }
+
+    @Test
+    @WithMockUser(roles = "PROFESSOR")
+    void loteComSelecaoVaziaDevolve400SemChamarService() throws Exception {
+        mvc.perform(post("/ocorrencias/lote")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"alunoIds\":[],\"tipo\":\"INDISCIPLINA\","
+                                + "\"descricao\":\"Aluno interrompeu a aula varias vezes.\","
+                                + "\"medidasTomadas\":\"Conversa\",\"data\":\"2026-10-30\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.campos.alunoIds").exists());
+
+        verify(service, never()).criarLote(any());
+    }
+
+    @Test
+    @WithMockUser(roles = "COORDENACAO")
+    void coordenacaoNaoCriaOcorrenciaEmLote() throws Exception {
+        mvc.perform(post("/ocorrencias/lote")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(corpoLote()))
+                .andExpect(status().isForbidden());
     }
 
     @Test
@@ -224,6 +263,20 @@ class OcorrenciaControllerTest {
         return """
                 {
                   "aluno": {"id": "33333333-3333-3333-3333-333333333333", "nome": "Ana Clara Souza"},
+                  "turma": "6A",
+                  "tipo": "INDISCIPLINA",
+                  "descricao": "Aluno interrompeu a aula varias vezes.",
+                  "medidasTomadas": "Conversa com o aluno",
+                  "medidasSugeridas": "Suspensão",
+                  "data": "2026-10-30"
+                }
+                """;
+    }
+
+    private static String corpoLote() {
+        return """
+                {
+                  "alunoIds": ["33333333-3333-3333-3333-333333333333", "55555555-5555-5555-5555-555555555555"],
                   "turma": "6A",
                   "tipo": "INDISCIPLINA",
                   "descricao": "Aluno interrompeu a aula varias vezes.",

@@ -121,8 +121,15 @@ public class Ocorrencia {
     public void atualizar(Aluno aluno, TipoOcorrencia tipo, String descricao,
                           String medidasTomadas, String medidasSugeridas, LocalDate data) {
         exigirAindaNaoLancada();
+        boolean trocouAluno = this.aluno == null
+                || this.aluno.getId() == null
+                || !this.aluno.getId().equals(aluno.getId());
         this.aluno = aluno;
-        this.turma = aluno.getTurma();
+        // A ocorrencia guarda a turma da epoca. Se o aluno foi movido depois,
+        // corrigir a descricao nao deve reescrever essa turma.
+        if (trocouAluno) {
+            this.turma = aluno.getTurma();
+        }
         this.tipo = tipo;
         this.descricao = descricao;
         this.medidasTomadas = medidasTomadas;

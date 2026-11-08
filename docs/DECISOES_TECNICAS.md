@@ -29,7 +29,7 @@ Comparando o frontend do professor (`app.js`, Pedro) com o backend já na base (
 | 1 | `POST /auth/login` | `POST /login` | Pedro (ajustar rota) |
 | 2 | Espera `token` no login e manda `Authorization: Bearer …` | **Sessão por cookie** `JSESSIONID`; a resposta do login não tem `token` | Pedro: remover o Bearer e usar `credentials: "include"` em todo `fetch`. Hoje `sessao.salvar(d.token, …)` guardaria `undefined`. |
 | 3 | Lê erro em `dados.mensagem \|\| dados.message` | Erros vêm como `{ "status": …, "erro": "…" }` | Pedro (ler `dados.erro`) |
-| 4 | `GET /alunos?busca=&turma=` | **Não existe** na tabela de API (seção 7) | Mateus + Pedro: combinar endpoints de alunos e turmas (listar turmas, buscar alunos) |
+| 4 | `GET /alunos?busca=&turma=` | Implementado, junto com `GET /turmas`, CRUD de alunos/turmas e `PATCH /alunos/turma` | Resolvido (backend + frontend) |
 | 5 | `tipo` = `DESRESPEITO`, `INDISCIPLINA`, … (8 valores) | Exemplo da doc usa `COMPORTAMENTAL`; a coluna é texto livre | Mateus + Pedro: fixar **uma** lista de tipos (ver seção 3). Os indicadores agrupam pelo texto gravado, então qualquer valor funciona — mas a lista precisa ser única. |
 | 6 | Turmas e alunos de mock (`6A`…`3EM`) | `turmas.nome` é `varchar(20)` e único | Ok, mas os nomes reais (ex.: "Maternal III NDO") cabem em 20? Conferir com a escola. |
 | 7 | Sem rota de pós-login | `redirectTo` = `/professor` ou `/coordenacao` | Pedro/Francisco: definir as rotas reais |
